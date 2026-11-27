@@ -180,7 +180,7 @@ export default defineComponent({
                 </el-col>
             </el-row>
 
-            <div class="qs-foot">PTBrush v1.2.1 · 规则引擎预览（44446）</div>
+            <div class="qs-foot">PTBrush v1.2.2</div>
 
             <el-dialog v-model="previewVisible" title="导入预览" width="520px">
                 <div v-if="preview">

@@ -166,17 +166,23 @@ export default defineComponent({
 
                     <el-divider style="margin:22px 0 16px;" />
 
-                    <p style="margin:0 0 8px;color:#1f2937;font-weight:600;">官网</p>
+                    <p style="margin:0 0 8px;color:#1f2937;font-weight:600;">项目地址</p>
                     <p style="margin:0 0 10px;">
-                        安装包下载、版本更新日志、Docker 部署文档都在官网上。
+                        官网、Docker 镜像和源码仓库都在下面，安装包下载与版本更新日志以官网为准。
                     </p>
                     <div class="verified-contact">
-                        <a href="https://zta.cc.cd/" target="_blank" rel="noopener">
-                            <el-button size="small" type="primary" plain>打开官网</el-button>
-                        </a>
-                        <a href="https://zta.cc.cd/download.html" target="_blank" rel="noopener">
-                            <el-button size="small" plain>下载 / 更新</el-button>
-                        </a>
+                        <div class="verified-contact-item">
+                            <span class="verified-contact-label">官网</span>
+                            <a href="https://zta.cc.cd/" target="_blank" rel="noopener">https://zta.cc.cd/</a>
+                        </div>
+                        <div class="verified-contact-item">
+                            <span class="verified-contact-label">Docker</span>
+                            <a href="https://hub.docker.com/r/xinya585/ptbrush" target="_blank" rel="noopener">hub.docker.com/r/xinya585/ptbrush</a>
+                        </div>
+                        <div class="verified-contact-item">
+                            <span class="verified-contact-label">GitHub</span>
+                            <a href="https://github.com/xinya585/ptbrush" target="_blank" rel="noopener">github.com/xinya585/ptbrush</a>
+                        </div>
                     </div>
                 </div>
             </el-card>
