@@ -24,7 +24,13 @@ warn() { printf '\033[33m[PTBrush]\033[0m %s\n' "$*"; }
 die()  { printf '\033[31m[PTBrush]\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
-    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    cat <<'EOF'
+用法：
+  sudo bash install.sh                    交互式安装（回车用默认值）
+  sudo bash install.sh --yes              全默认一键安装
+  sudo bash install.sh --port 8080 --data /srv/ptbrush --yes
+  sudo bash install.sh --asset ./ptbrush-linux-amd64.tar.gz --yes   离线安装
+EOF
     exit 0
 }
 

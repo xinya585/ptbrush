@@ -29,6 +29,7 @@ pause() { read -r -p "按回车继续..." _ || true; }
 
 svc_active() { systemctl is-active ptbrush 2>/dev/null || true; }
 local_ip() { hostname -I 2>/dev/null | awk '{print $1}'; }
+app_version() { curl -fsS "http://127.0.0.1:${PORT}/api/version" 2>/dev/null | sed -n 's/.*"version":"\([^"]*\)".*/\1/p'; }
 health() {
     for _ in $(seq 1 20); do
         if curl -fsS "http://127.0.0.1:${PORT}/api/version" >/dev/null 2>&1; then return 0; fi
@@ -44,7 +45,8 @@ show_status() {
     printf '  地址   : http://%s:%s\n' "$(local_ip)" "$PORT"
     printf '  数据   : %s（%s）\n' "$DATA" "$(du -sh "$DATA" 2>/dev/null | awk '{print $1}')"
     printf '  程序   : %s\n' "$PREFIX/app"
-    printf '  版本   : %s\n' "$(curl -fsS "http://127.0.0.1:${PORT}/api/version" 2>/dev/null || echo '服务未响应')"
+    local ver; ver="$(app_version)"; [ -n "$ver" ] || ver="服务未响应"
+    printf '  版本   : %s\n' "$ver"
     printf '  开机自启: %s\n' "$(systemctl is-enabled ptbrush 2>/dev/null || true)"
 }
 
@@ -56,7 +58,7 @@ do_upgrade() {
     [ -f "$PREFIX/install.sh" ] || { err "找不到 $PREFIX/install.sh，请重新跑一次安装脚本"; return; }
     warn "将从 GitHub 拉取最新版本，数据目录不动"
     bash "$PREFIX/install.sh" --yes || { err "升级失败"; return; }
-    ok "升级完成，当前版本 $(curl -fsS "http://127.0.0.1:${PORT}/api/version" 2>/dev/null)"
+    ok "升级完成，当前版本 $(app_version)"
 }
 
 do_port() {
