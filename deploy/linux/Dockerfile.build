@@ -2,11 +2,13 @@
 FROM xinya585/ptbrush:latest AS runtime
 
 FROM m.daocloud.io/docker.io/library/python:3.10-slim-bullseye
+RUN printf "deb http://mirrors.ustc.edu.cn/debian bullseye main\ndeb http://mirrors.ustc.edu.cn/debian bullseye-updates main\ndeb http://mirrors.ustc.edu.cn/debian-security bullseye-security main\n" > /etc/apt/sources.list
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_DEFAULT_TIMEOUT=120
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
 COPY --from=runtime /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 

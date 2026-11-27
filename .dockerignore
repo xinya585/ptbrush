@@ -14,3 +14,4 @@ build/
 *.spec
 *.zip
 *.exe
+!ptbrush.spec

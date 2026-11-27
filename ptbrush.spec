@@ -26,6 +26,14 @@ hiddenimports = [
     "flask_cors",
     "jsonpath",
     "tzlocal",
+    "jaraco",
+    "jaraco.text",
+    "jaraco.context",
+    "jaraco.functools",
+    "more_itertools",
+    "autocommand",
+    "backports.tarfile",
+    "importlib_resources",
 ]
 
 a = Analysis(
@@ -37,7 +45,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "PIL", "pystray", "win_desktop", "win_ui"],
+    excludes=["tkinter", "PIL", "pystray", "win_desktop", "win_ui", "pkg_resources", "setuptools"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)
