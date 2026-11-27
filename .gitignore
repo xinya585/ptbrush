@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.log
+*.db
+*.db-wal
+*.db-shm
+data/
+config/config.toml
+backups/
+dist/
+build/
+.venv/
+.DS_Store

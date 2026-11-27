@@ -1,0 +1,16 @@
+# 构建上下文排除项：镜像里只保留运行时需要的源码与静态资源
+data/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+.dockerignore
+*.log
+*.bak
+*.bak-*
+dist/
+build/
+*.spec
+*.zip
+*.exe

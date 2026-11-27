@@ -1,0 +1,32 @@
+# PTBrush 运行时依赖（手工维护，只列真正会 import 的包 + 必要传递依赖）
+# 说明：Dockerfile 基于预装依赖的基础镜像，本文件用于换基座或本地开发时复现环境。
+annotated-types==0.7.0
+apscheduler==3.11.3
+blinker==1.9.0
+certifi==2026.6.17
+charset-normalizer==3.4.7
+click==8.4.2
+flask==3.1.3
+flask-cors==5.0.1
+idna==3.18
+itsdangerous==2.2.0
+jinja2==3.1.6
+jsonpath==0.82.2
+loguru==0.7.3
+markupsafe==3.0.3
+packaging==26.2
+peewee==3.19.0
+pydantic==2.13.4
+pydantic-core==2.46.4
+pydantic-settings==2.14.2
+python-dotenv==1.2.2
+qbittorrent-api==2026.6.1
+requests==2.34.2
+tomli==2.4.1
+tomli-w==1.2.0
+typing-extensions==4.15.0
+typing-inspection==0.4.2
+tzdata==2026.2
+tzlocal==5.4.3
+urllib3==2.7.0
+werkzeug==3.1.8

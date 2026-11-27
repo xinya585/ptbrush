@@ -1,0 +1,95 @@
+# 刷流配置
+[brush]
+# 刷流任务工作时间范围设置
+# 格式说明:
+# - "1-4" 表示每天凌晨1点00分到4点59分工作
+# - "12-18" 表示每天12点00分到18点59分工作
+# - "20-23,0-6" 表示每天20点00分到23点59分以及0点00分到6点59分工作
+# 留空则表示24小时工作
+work_time = ""
+
+
+# 保留最小剩余磁盘空间，剩余空间小于此值时不会添加新的种子
+# 支持以下格式:
+# - 纯数字 (默认单位为B)
+# - "1KiB", "1MiB", "1GiB", "1TiB" 
+# 默认值为 1024GiB
+min_disk_space = "1024GiB"
+
+# 位于下载状态的种子数上限，当qb中下载状态种子数大于此值时不会添加新的任务
+max_downloading_torrents = 6  
+
+# 平均速度计算用的时间周期，默认即可，不推荐修改
+upload_cycle = 600  # 平均上传速度计算周期，单位秒，默认600秒即10分钟 
+download_cycle = 600 # 平均下载速度计算周期，单位秒，默认600秒即10分钟
+
+# 单个种子的文件大小限制，支持以下格式:
+# - 纯数字 (默认单位为B)
+# - "1KiB", "1MiB", "1GiB", "1TiB"
+# 超过此限制后，会将种子中的部分文件设置为不下载(也就是对大包就行拆包)
+# 一般不需要修改
+torrent_max_size = "10GiB"
+
+# 允许种子最大的连续无活跃(无下载也无上传)时间，超过此时间将会被删除，单位为:分钟，默认30
+max_no_activate_time = 10
+
+# 低速上传删种（盒子专用）：独立开关，默认 false。关着时下面两个数字只是草稿。
+slow_up_delete_enabled = false
+# 低速上传持续多少分钟就删（盒子专用）：只判已经下载完成的种子，
+# 上传速度一直低于 slow_up_delete_speed（MB/s）并持续 slow_up_delete_minutes 分钟
+# 就删掉腾保种位。0 表示关闭；H&R 种子不参与这条。
+slow_up_delete_minutes = 0
+slow_up_delete_speed = 0.1
+
+# 只下载这些促销类型的种子（多选，至少选一个）:
+# free = 免费；free_2x = 2X 免费；2x = 2X 上传；half_down = 50% 下载；all = 不限制
+# 默认只挑免费的，下载不计下载量
+promotions = ["free", "free_2x"]
+
+# 是否排除带 H&R（Hit and Run）标记的种子，默认 true
+exclude_hr = true
+
+# 免费种子剩余免费时间不足多少小时就不下载，0 表示不限制
+min_free_hours = 3
+
+
+# 下载器设置，仅支持 qBittorrent；可以配多个，用别名区分
+# 站点里的 downloader 字段填这里的别名，就表示该站点的种子推给这个下载器；
+# 站点不填（或填的别名不存在）时用第一个，也就是「主下载器」
+[[downloaders]]
+# 别名：站点绑定下载器时按它匹配，改了别名记得同步改站点
+alias = "默认"
+url = "http://127.0.0.1:8080"
+# 认证方式："password" 使用用户名密码；"api_key" 使用 qBittorrent v5.2.0+ 的 API Key
+auth_type = "password"
+username = ""
+password = ""
+# qBittorrent API Key，与下方站点 x-api-key 不是同一个东西
+api_key = ""
+# 该下载器的默认保存路径（容器内绝对路径）。
+# 站点编辑里没单独填「保存路径」时，种子就落这个目录；留空则用 qB 分类路径（默认下载目录/_ptbrush）
+save_path = "/downloads"
+
+# 第二个下载器示例（用不到可以整段删掉）
+# [[downloaders]]
+# alias = "备用qB"
+# url = "http://127.0.0.1:8081"
+# auth_type = "password"
+# username = "admin"
+# password = "xxxxxx"
+# save_path = "/downloads2"
+
+# 更新与下载节点
+# 检查更新时，CF / 海外两个节点并发拉版本清单，自动用最快的那份；
+# 下载安装包走 download_node 选的节点，失败会自动换下一个节点继续。
+# download_node: cf = Cloudflare，ov = 海外节点
+[update]
+download_node = "cf"
+
+
+# M-Team配置示例，请自行替换x-api-key参数
+[[sites]]
+name = "M-Team"
+[[sites.headers]]
+key = "x-api-key"
+value = "xxxxx"

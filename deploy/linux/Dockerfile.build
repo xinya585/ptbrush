@@ -1,0 +1,25 @@
+# 用运行镜像的依赖 + Debian 11 的 glibc 2.31 构建，兼顾兼容性与版本一致
+FROM xinya585/ptbrush:latest AS runtime
+
+FROM m.daocloud.io/docker.io/library/python:3.10-slim-bullseye
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=120
+
+COPY --from=runtime /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+
+WORKDIR /build
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends binutils \
+ && rm -rf /var/lib/apt/lists/*
+RUN pip install --retries 5 pyinstaller==6.11.1
+
+COPY . .
+RUN pyinstaller --noconfirm --clean ptbrush.spec
+
+RUN test -x dist/ptbrush/ptbrush \
+ && test -f dist/ptbrush/_internal/web/static/index.html \
+ && test -f dist/ptbrush/_internal/config/config.example.toml \
+ && ./dist/ptbrush/ptbrush --version
