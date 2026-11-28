@@ -138,7 +138,21 @@ export default defineComponent({
                 <router-view />
             </el-main>
             <el-footer class="app-footer" :height="isMobile ? '30px' : '34px'">
-                <span v-if="version">PTBrush v{{ version }}</span>
+                <div class="app-footer-meta">
+                    <span v-if="version">PTBrush v{{ version }}</span>
+                    <a class="app-footer-link" href="mailto:scyink@gmail.com" aria-label="邮箱反馈" title="邮箱反馈">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                            <path d="M3.5 7l8.5 6 8.5-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </a>
+                    <a class="app-footer-link" href="https://t.me/+sfl6a3I76h45ZWQ1" target="_blank" rel="noopener" aria-label="Telegram 反馈群" title="Telegram 反馈群">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M21 4.5 3.2 11.4l5.6 2 2.1 6.1 3.2-3.7 5.4 4.1L21 4.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                            <path d="M8.8 13.4 18 7.2l-7.1 8.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </a>
+                </div>
             </el-footer>
 
             <el-drawer

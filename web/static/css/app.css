@@ -356,6 +356,31 @@ body {
 .app-footer span {
     white-space: nowrap;
 }
+.app-footer-meta {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.app-footer-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    color: #9ca3af;
+    text-decoration: none;
+    transition: color .15s ease, background .15s ease;
+}
+.app-footer-link:hover {
+    color: #6b7280;
+    background: #eef2f7;
+}
+.app-footer-link svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
 /* ---------- 仪表盘：站点概览 ---------- */
 .site-overview-list {
     display: flex;
