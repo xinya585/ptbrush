@@ -1,7 +1,7 @@
 import { defineComponent, reactive, ref, computed, onMounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import { api } from '../api.js';
-import { promotionLabel } from '../promo.js';
+import { promotionLabel as promoLabel } from '../promo.js';
 
 // 搜片：关键字 → TMDB 候选海报 → 选中一部（跨站搜资源在下一步接入）
 // 站点开关只影响搜片，和「刷流配置」里那套开关各管一套、互不干扰
