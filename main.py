@@ -165,13 +165,14 @@ def main():
         logger.info("已尝试打开浏览器，若没有弹出请手动访问上面的地址")
 
     if is_frozen():
-        # 便携版才有自动升级：容器里升级走换镜像，不需要程序自己换文件
-        from update import auto_check_loop
+        # 便携版 / Linux 原生安装才有自动检查更新；容器里升级走换镜像，不需要程序自己换文件
+        from update import auto_check_loop, deploy_mode
 
-        stop_update = threading.Event()
-        threading.Thread(
-            target=auto_check_loop, args=(stop_update,), name="ptbrush-update", daemon=True
-        ).start()
+        if deploy_mode() != "docker":
+            stop_update = threading.Event()
+            threading.Thread(
+                target=auto_check_loop, args=(stop_update,), name="ptbrush-update", daemon=True
+            ).start()
     
     # PTBRUSH_WEB_ONLY=1：只跑 Web（预览/调界面用），刷流、删种、统计全部不挂调度。
     # 预览容器要是连了同一台下载器，会和生产容器抢着删种，必须能单独关掉后台任务。

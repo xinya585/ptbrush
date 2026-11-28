@@ -31,6 +31,8 @@ from version import get_version
 
 DEFAULT_MANIFEST_URL = "https://zta.cc.cd/latest.json"
 PLATFORM_KEY = "windows-x64"
+LINUX_PLATFORM_KEY = "linux-x64"
+LINUX_ASSET = "ptbrush-linux-amd64.tar.gz"
 UPDATE_DIR_NAME = "updates"
 
 # 节点表：key 同时用在 config.toml 的 [update] download_node 里
@@ -47,6 +49,34 @@ NODES: Dict[str, Dict[str, str]] = {
     },
 }
 NODE_ORDER = ("cf", "ov")
+
+
+def deploy_mode() -> str:
+    """部署形态：windows 便携版 / linux 原生安装 / docker 容器 / source 源码。
+
+    容器里跑的也是同一个 PyInstaller 二进制，光看 frozen 分不出来，所以先认容器标记。
+    """
+    try:
+        if Path("/.dockerenv").exists() or os.environ.get("PTBRUSH_DOCKER"):
+            return "docker"
+    except OSError:
+        pass
+    if getattr(sys, "frozen", False):
+        if sys.platform == "win32":
+            return "windows"
+        if sys.platform.startswith("linux"):
+            return "linux"
+        return "other"
+    return "source"
+
+
+def platform_key() -> str:
+    return LINUX_PLATFORM_KEY if deploy_mode() == "linux" else PLATFORM_KEY
+
+
+def upgradeable() -> bool:
+    """能不能自己下包、换文件、重启：只有 Windows 便携版和 Linux 原生安装版。"""
+    return deploy_mode() in ("windows", "linux")
 
 
 _APPLY_SCRIPT = r'''
@@ -301,9 +331,16 @@ def check(timeout: int = 10) -> Dict[str, Any]:
 
     best = min(ok_rows, key=lambda r: r["elapsed"])
     data = best["data"]
-    platform = (data.get("platforms") or {}).get(PLATFORM_KEY) or {}
+    key = platform_key()
+    platform = (data.get("platforms") or {}).get(key) or {}
     latest = str(data.get("version") or "").strip()
     current = get_version()
+
+    if deploy_mode() == "linux" and not platform.get("url"):
+        with _lock:
+            _state["error"] = "版本清单里还没有 Linux 安装包，稍后再试"
+            _state["checked_at"] = time.time()
+        return state()
 
     with _lock:
         _state.update(
@@ -316,7 +353,10 @@ def check(timeout: int = 10) -> Dict[str, Any]:
                 "url": platform.get("url"),
                 "size": platform.get("size"),
                 "sha256": (platform.get("sha256") or "").lower() or None,
+                "fallback_url": platform.get("fallback"),
                 "mirrors": data.get("mirrors") or {},
+                "platform_key": key,
+                "deploy": deploy_mode(),
                 "downloaded": None,
                 "ready": False,
                 "checked_at": time.time(),
@@ -412,13 +452,28 @@ def _package_name(url: str) -> str:
     """从清单地址里取安装包文件名。
 
     清单里的地址带 ?v=<sha8>（防缓存），直接 Path(url).name 会把 "?v=..." 一起带进来，
-    存成 "xxx.zip_v_587c6980"，之后 Expand-Archive 就认不出这是 zip。
+    存成 "xxx.zip_v_587c6980"，之后 Expand-Archive / tar 就认不出来。
+    Windows 包是 zip，Linux 包是 tar.gz，后缀必须原样保留。
     """
     name = Path(urlsplit(url or "").path).name
-    name = re.sub(r"[^A-Za-z0-9_.-]", "_", name) or "PTBrush-update.zip"
-    if not name.lower().endswith(".zip"):
-        name += ".zip"
-    return name
+    name = re.sub(r"[^A-Za-z0-9_.-]", "_", name) or "PTBrush-update"
+    lowered = name.lower()
+    if lowered.endswith((".zip", ".tar.gz", ".tgz")):
+        return name
+    if deploy_mode() == "linux":
+        return name + ".tar.gz"
+    return name + ".zip"
+
+
+def _linux_urls(snap: Dict[str, Any]) -> list:
+    """Linux 安装包候选：清单地址（R2）→ 清单里的 fallback（GitHub Release）。"""
+    rows = []
+    if snap.get("url"):
+        rows.append(("cf", snap["url"]))
+    fallback = snap.get("fallback_url")
+    if fallback and fallback != snap.get("url"):
+        rows.append(("fallback", fallback))
+    return rows
 
 
 def _node_urls(snap: Dict[str, Any]) -> list:
@@ -511,9 +566,10 @@ def download(progress=None) -> Dict[str, Any]:
 
     _cleanup_stale(target_dir, final)
 
+    rows = _linux_urls(snap) if deploy_mode() == "linux" else _node_urls(snap)
     last_error: Optional[BaseException] = None
-    for node_key, url in _node_urls(snap):
-        label = NODES.get(node_key, {}).get("label", node_key)
+    for node_key, url in rows:
+        label = NODES.get(node_key, {}).get("label", "GitHub" if node_key == "fallback" else node_key)
         part = target_dir / f"{final.stem}.{node_key}.{os.getpid()}-{int(time.time())}{final.suffix}.part"
         logger.info(f"开始从{label}下载 {url}")
         try:
@@ -531,16 +587,16 @@ def download(progress=None) -> Dict[str, Any]:
 
     if isinstance(last_error, OSError):
         raise RuntimeError(_describe_oserror(last_error))
-    raise RuntimeError(f"两个节点都没能下载成功，最后一次错误：{last_error}")
+    raise RuntimeError(f"下载地址都没能成功，最后一次错误：{last_error}")
 
 
 
 def _cleanup_stale(target_dir: Path, keep: Path) -> None:
-    """清掉上次残留的 .part 和旧版本 zip；清不掉也不影响升级。"""
+    """清掉上次残留的 .part 和旧版本安装包；清不掉也不影响升级。"""
     for p in target_dir.iterdir():
         if p.name == keep.name or not p.is_file():
             continue
-        if p.suffix == ".part" or (p.suffix == ".zip" and p.stem != keep.stem):
+        if p.suffix == ".part" or (p.suffix in (".zip", ".gz", ".tgz") and p.stem != keep.stem):
             try:
                 _retry_fs(lambda p=p: p.unlink(missing_ok=True), label=f"清理残留 {p.name}", attempts=2)
             except OSError as e:
@@ -566,16 +622,8 @@ def _promote(part: Path, final: Path) -> Path:
         return alt
 
 
-def apply() -> None:
+def _apply_windows(pkg: Path) -> None:
     """写升级脚本 → 启动独立进程 → 退出本程序，由脚本替换目录并重启。"""
-    snap = state()
-    pkg = snap.get("downloaded")
-    if not pkg or not Path(pkg).exists():
-        raise RuntimeError("还没有下载好的更新包")
-
-    if sys.platform != "win32" or not getattr(sys, "frozen", False):
-        raise RuntimeError("只有 Windows 便携版支持自动替换升级")
-
     script = data_dir() / UPDATE_DIR_NAME / "apply_update.ps1"
     # powershell.exe（5.1）默认按 ANSI 读脚本，UTF-8 无 BOM 会把中文后面的引号、括号吃掉，
     # 所以这里必须写带 BOM 的 UTF-8，否则脚本直接语法错误。
@@ -621,10 +669,145 @@ def apply() -> None:
     threading.Timer(1.2, lambda: os._exit(0)).start()
 
 
+def _extract_tar(pkg: Path, dest: Path) -> None:
+    import tarfile
+
+    with tarfile.open(pkg, "r:gz") as tar:
+        # Python 3.12+ 要求显式声明过滤策略；老版本没有这个参数
+        try:
+            tar.extractall(dest, filter="data")
+        except TypeError:
+            tar.extractall(dest)
+
+
+def _move_into_prev(src: Path, prev: Path) -> None:
+    dst = prev / src.name
+    if dst.exists():
+        import shutil
+
+        if dst.is_dir():
+            shutil.rmtree(dst, ignore_errors=True)
+        else:
+            dst.unlink(missing_ok=True)
+    src.rename(dst)
+
+
+def _apply_linux(pkg: Path) -> None:
+    """在进程内换掉程序目录里的文件，然后退出让 systemd 拉起重启。
+
+    安装包是 PyInstaller 的 onedir 结构（ptbrush + _internal），整个目录才是程序本体；
+    数据目录默认在 /var/lib/ptbrush，和程序目录分开，换文件不会碰到配置和数据库。
+    前提：/opt/ptbrush/app 对服务用户 ptbrush 可写（install.sh 里已经 chown 过）。
+    """
+    root = app_root()
+    if not os.access(root, os.W_OK | os.X_OK):
+        raise RuntimeError(
+            f"安装目录 {root} 对当前用户不可写，无法在网页里替换。"
+            "请先执行一次 sudo bash /opt/ptbrush/install.sh --yes（数据不动），之后就能网页一键升级"
+        )
+    if not os.environ.get("INVOCATION_ID"):
+        raise RuntimeError("当前不是 systemd 托管运行，替换后不会自动重启；请用 sudo bash /opt/ptbrush/install.sh --yes 升级")
+
+    stage = root / ".upgrade"
+    prev = root / ".prev"
+
+    import shutil
+
+    shutil.rmtree(stage, ignore_errors=True)
+    shutil.rmtree(prev, ignore_errors=True)
+    stage.mkdir(parents=True, exist_ok=True)
+    logger.info(f"解包 {pkg} -> {stage}")
+    _extract_tar(pkg, stage)
+
+    new = stage / "ptbrush"
+    if not (new / "ptbrush").is_file():
+        # 兼容包里只有一层的结构
+        if (stage / "ptbrush").is_file():
+            new = stage
+        else:
+            raise RuntimeError("安装包结构不对：找不到 ptbrush 可执行文件")
+
+    prev.mkdir(parents=True, exist_ok=True)
+    data_path = data_dir().resolve()
+    moved_old: list = []
+    moved_new: list = []
+
+    def _skip(name: str, dst: Path) -> bool:
+        if name in ("data", ".upgrade", ".prev"):
+            return True
+        # 数据目录万一被放在程序目录下面，也绝不覆盖
+        return str(data_path) == str(dst) or str(data_path).startswith(str(dst) + os.sep)
+
+    try:
+        for item in sorted(new.iterdir()):
+            dst = root / item.name
+            if _skip(item.name, dst):
+                continue
+            if dst.exists():
+                _move_into_prev(dst, prev)
+                moved_old.append(item.name)
+            item.rename(dst)
+            moved_new.append(item.name)
+        os.chmod(root / "ptbrush", 0o755)
+        logger.info(f"程序目录已替换为新版本：{', '.join(moved_new)}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"替换失败，回滚：{e}")
+        for name in reversed(moved_new):
+            try:
+                target = root / name
+                if target.is_dir():
+                    shutil.rmtree(target, ignore_errors=True)
+                else:
+                    target.unlink(missing_ok=True)
+            except OSError:
+                pass
+        for name in moved_old:
+            try:
+                (prev / name).rename(root / name)
+            except OSError as err:
+                logger.error(f"回滚 {name} 失败：{err}")
+        raise RuntimeError(f"替换程序文件失败，已回滚到旧版本：{e}") from e
+
+    # 清掉升级包和暂存目录，旧文件留一份 .prev 以便下次启动失败时人工回滚
+    try:
+        shutil.rmtree(stage, ignore_errors=True)
+    except OSError:
+        pass
+    upd = data_dir() / UPDATE_DIR_NAME
+    if upd.is_dir():
+        for f in upd.iterdir():
+            if f.is_file() and f.suffix in (".gz", ".zip", ".part"):
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+
+    logger.info("新版本已就位，退出进程交给 systemd 重启")
+    threading.Timer(1.5, lambda: os._exit(1)).start()
+
+
+def apply() -> None:
+    snap = state()
+    pkg = snap.get("downloaded")
+    if not pkg or not Path(pkg).exists():
+        raise RuntimeError("还没有下载好的更新包")
+
+    mode = deploy_mode()
+    if mode == "windows":
+        _apply_windows(Path(pkg))
+    elif mode == "linux":
+        _apply_linux(Path(pkg))
+    elif mode == "docker":
+        raise RuntimeError("容器版升级走镜像：docker pull xinya585/ptbrush:latest 后重建容器")
+    else:
+        raise RuntimeError("当前部署方式不支持自动替换升级")
+
+
 def auto_check_loop(stop_event: threading.Event, interval: int = 6 * 3600) -> None:
-    """启动后立刻查一次，之后每 interval 秒查一次。"""
+    """启动后立刻查一次，之后每 interval 秒查一次。容器版不查（升级走镜像）。"""
     time.sleep(6)
     while not stop_event.is_set():
-        if getattr(sys, "frozen", False):
+        if upgradeable():
             check()
         stop_event.wait(interval)
+

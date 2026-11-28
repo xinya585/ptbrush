@@ -3308,6 +3308,78 @@ body {
     gap: 8px;
 }
 
+/* Linux 原生安装：网页内检查更新 + 一键升级 */
+.upd-badge {
+    font-size: 11.5px;
+    color: #67c23a;
+    border: 1px solid rgba(103, 194, 58, .35);
+    background: rgba(103, 194, 58, .08);
+    border-radius: 999px;
+    padding: 1px 9px;
+}
+
+.upd-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 14px 0 4px;
+}
+
+.upd-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid #ebeef5;
+    border-radius: 8px;
+    background: #fafbfc;
+    min-width: 0;
+}
+
+.upd-label {
+    font-size: 12px;
+    color: #909399;
+}
+
+.upd-item b {
+    font-size: 13.5px;
+    color: #303133;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.upd-item b.upd-new {
+    color: #e6a23c;
+}
+
+.upd-item b.upd-bad {
+    color: #f56c6c;
+}
+
+.upd-error {
+    margin-top: 10px;
+    padding: 8px 12px;
+    font-size: 12.5px;
+    color: #f56c6c;
+    background: rgba(245, 108, 108, .07);
+    border: 1px solid rgba(245, 108, 108, .25);
+    border-radius: 6px;
+}
+
+.upd-notes {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: #909399;
+    line-height: 1.7;
+}
+
+@media (max-width: 760px) {
+    .upd-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+
 @media (max-width: 640px) {
     .node-grid {
         gap: 6px;

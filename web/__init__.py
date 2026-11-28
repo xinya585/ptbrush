@@ -69,12 +69,15 @@ def create_app():
 
     @app.route("/api/version")
     def api_version():
+        from update import deploy_mode
+
         return jsonify({
             "version": get_version(),
             "name": "ptbrush",
             # 只有 PyInstaller 打出来的 Windows 便携版才能自己下载 zip、替换文件、重启；
-            # 容器版升级走换镜像，前端据此把「下载节点」这类选项收起来。
+            # Linux 原生安装版换 tar.gz 后退出让 systemd 重启；容器版升级走换镜像。
             "portable": bool(getattr(sys, "frozen", False)),
+            "deploy": deploy_mode(),
             "platform": sys.platform,
         })
 

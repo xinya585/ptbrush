@@ -137,6 +137,9 @@ mv "$PREFIX/app.new" "$PREFIX/app"
 if [ -f "$APPDIR/install.sh" ]; then install -m 755 "$APPDIR/install.sh" "$PREFIX/install.sh"; fi
 if [ -f "$APPDIR/menu.sh" ]; then install -m 755 "$APPDIR/menu.sh" "$BINLINK"; fi
 chmod 755 "$PREFIX/app/ptbrush"
+# 程序目录交给服务用户：网页里的「一键升级」要能替换 ptbrush / _internal 后退出让 systemd 重启。
+# 数据目录另算，仍然是 ptbrush:ptbrush；这里只是让程序能更新自己的代码。
+chown -R ptbrush:ptbrush "$PREFIX/app"
 chown -R ptbrush:ptbrush "$DATA"
 
 cat > "$ENVFILE" <<EOF

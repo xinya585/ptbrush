@@ -44,6 +44,8 @@ def update_status():
     snap = update.state()
     snap["manifest"] = update.manifest_url()
     snap.setdefault("node", update.selected_node())
+    snap["deploy"] = update.deploy_mode()
+    snap["upgradeable"] = update.upgradeable()
     return jsonify(snap)
 
 
@@ -56,11 +58,14 @@ def update_check():
 @api_update_bp.route("/api/update/download", methods=["POST"])
 @login_required
 def update_download():
-    if not getattr(sys, "frozen", False):
-        # 容器/源码运行时下载了也替换不了自己的代码，白占 30MB，直接说清楚怎么升
+    mode = update.deploy_mode()
+    if mode == "docker":
+        # 容器里代码在镜像内，下载了也替换不了自己，白占 30MB，直接说清楚怎么升
         return jsonify({
             "error": "容器版不支持下载安装包升级，请更新镜像：docker pull xinya585/ptbrush:latest 后重建容器",
         }), 400
+    if mode == "source":
+        return jsonify({"error": "源码运行方式不支持自动下载升级包"}), 400
     try:
         return jsonify(update.download())
     except Exception as e:
@@ -76,7 +81,26 @@ def update_apply():
     except Exception as e:
         logger.warning(f"应用更新失败: {e}")
         return jsonify({"error": str(e)}), 400
-    return jsonify({"ok": True, "message": "升级脚本已启动，程序即将退出并自动重启"})
+    message = "升级脚本已启动，程序即将退出并自动重启"
+    if update.deploy_mode() == "linux":
+        message = "程序文件已替换，正在重启服务"
+    return jsonify({"ok": True, "message": message})
+
+
+@api_update_bp.route("/api/update/oneclick", methods=["POST"])
+@login_required
+def update_oneclick():
+    """Linux 原生安装版：下载 → 校验 → 替换 → 重启，一次点完。"""
+    mode = update.deploy_mode()
+    if mode != "linux":
+        return jsonify({"error": "一键升级只在 Linux 原生安装版可用"}), 400
+    try:
+        update.download()
+        update.apply()
+    except Exception as e:
+        logger.warning(f"Linux 一键升级失败: {e}")
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"ok": True, "message": "安装包已下载并校验通过，正在替换程序文件"})
 
 
 @api_update_bp.route("/api/update/nodes", methods=["GET"])

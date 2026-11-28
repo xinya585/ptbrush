@@ -1,4 +1,4 @@
-import { defineComponent, ref, onMounted } from 'vue';
+import { defineComponent, ref, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '../api.js';
 import PasswordCard from '../components/PasswordCard.js';
@@ -108,8 +108,8 @@ export default defineComponent({
                 importDone.value = data;
                 ElMessage.success(data.message || '导入完成');
                 await loadBackup();
-                // 备份包里带着 [update] 段，导入后节点选择可能变了，顺手同步一下界面（容器版没有这块）
-                if (portable.value) await loadNodes(false);
+                // 备份包里带着 [update] 段，导入后节点选择可能变了，顺手同步一下界面（只有便携版有这块）
+                if (deploy.value === 'windows') await loadNodes(false);
             } catch (e) {
                 ElMessage.error(e.message || '导入失败');
             } finally {
@@ -141,8 +141,9 @@ export default defineComponent({
         const nodeRows = ref([]);
         const nodeSaving = ref(false);
         const nodeProbing = ref(false);
-        // 只有 Windows 便携版能自己下载 zip 替换升级；容器版把整块收成一条升级说明
-        const portable = ref(true);
+        // 部署形态：windows（便携版，保留节点选择） / linux（原生安装，网页内升级） / docker、source（不显示升级）
+        const deploy = ref('windows');
+        const currentVersion = ref('');
 
         async function loadNodes(probe) {
             try {
@@ -176,18 +177,77 @@ export default defineComponent({
             }
         }
 
+        // ---- Linux 程序升级 ----
+        const upd = ref({ latest: null, has_update: false, notes: '', checked_at: null, error: null, size: null });
+        const checking = ref(false);
+        const upgrading = ref(false);
+
+        const updStatus = computed(() => {
+            if (checking.value) return '检查中…';
+            if (upgrading.value) return '正在升级…';
+            if (upd.value.error) return '检查失败';
+            if (!upd.value.latest) return '还没有检查过';
+            return upd.value.has_update ? `有新版本 ${upd.value.latest}` : '已是最新版本';
+        });
+
+        async function checkUpdate() {
+            checking.value = true;
+            try {
+                upd.value = await api.post('/api/update/check');
+                if (upd.value.error) ElMessage.error(upd.value.error);
+                else if (upd.value.has_update) ElMessage.success(`发现新版本 ${upd.value.latest}`);
+                else ElMessage.success('已是最新版本');
+            } catch (e) {
+                ElMessage.error(e.message || '检查更新失败');
+            } finally {
+                checking.value = false;
+            }
+        }
+
+        async function upgradeNow() {
+            try {
+                await ElMessageBox.confirm(
+                    `将下载 ${upd.value.latest} 的安装包，校验后替换程序文件并重启服务，约 10 秒不可用。站点、下载器配置都在数据目录里，不受影响。现在升级吗？`,
+                    '升级并重启',
+                    { type: 'warning', confirmButtonText: '立即升级', cancelButtonText: '取消' },
+                );
+            } catch (e) {
+                return;
+            }
+            upgrading.value = true;
+            try {
+                const res = await api.post('/api/update/oneclick');
+                ElMessage.success(res.message || '正在替换程序文件，稍后自动重启');
+                setTimeout(() => location.reload(), 8000);
+            } catch (e) {
+                upgrading.value = false;
+                ElMessage.error(e.message || '升级失败');
+            }
+        }
+
         onMounted(async () => {
             load();
             loadBackup();
             try {
                 const info = await api.get('/api/version');
-                // 老版本后端没有 portable 字段，按便携版处理，保持原行为
-                portable.value = info.portable !== false;
+                // 老版本后端没有 deploy 字段，按便携版处理，保持原行为
+                deploy.value = info.deploy || 'windows';
+                currentVersion.value = info.version || '';
+                if (info.version) upd.value.current = info.version;
             } catch (e) {
                 // ignore
             }
-            if (portable.value) loadNodes(false);
+            if (deploy.value === 'windows') loadNodes(false);
         });
+
+        return {
+            tab, loading, loginRequired, load,
+            exporting, importing, importDone, backupInfo,
+            exportBackup, pickBackup, restartApp,
+            nodeForm, nodeRows, nodeSaving, nodeProbing, deploy,
+            saveNode, probeNodes,
+            currentVersion, upd, checking, upgrading, updStatus, checkUpdate, upgradeNow,
+        };
 
         return {
             tab, loading, loginRequired, load,
@@ -245,16 +305,16 @@ export default defineComponent({
                 </div>
             </el-card>
 
-            <el-card shadow="hover" style="margin-bottom:16px;">
+            <el-card v-if="deploy === 'windows'" shadow="hover" style="margin-bottom:16px;">
                 <template #header>
                     <div class="card-header-row">
-                        <strong>{{ portable ? '下载与更新节点' : '程序升级' }}</strong>
-                        <div v-if="portable" class="node-actions">
+                        <strong>下载与更新节点</strong>
+                        <div class="node-actions">
                             <el-button size="small" plain :loading="nodeProbing" @click="probeNodes">测速</el-button>
                         </div>
                     </div>
                 </template>
-                <div v-if="portable" class="node-block">
+                <div class="node-block">
                     <div class="node-desc">
                         检查更新时两个节点并发拉版本清单，自动用最快的那一个；下载安装包按下面选的节点走，失败会自动换下一个节点继续。
                     </div>
@@ -283,16 +343,44 @@ export default defineComponent({
                         <span class="node-tip">改完立即生效，下次检查更新就用新节点。</span>
                     </div>
                 </div>
-                <div v-else class="node-alt">
-                    <div class="node-alt-title">当前是容器部署，升级走镜像，不走这个下载节点</div>
-                    <div class="node-alt-desc">
-                        程序内置的「下载安装包 → 替换文件 → 自动重启」只对 Windows 便携版有效。容器里代码在镜像内，替换不了自己，所以这组节点选择在容器版没有作用，已经收起来了。
+            </el-card>
+
+            <el-card v-else-if="deploy === 'linux'" shadow="hover" style="margin-bottom:16px;">
+                <template #header>
+                    <div class="card-header-row">
+                        <strong>程序升级</strong>
+                        <span class="upd-badge">Linux 原生安装</span>
                     </div>
-                    <div class="node-alt-code">docker pull xinya585/ptbrush:latest</div>
-                    <div class="node-alt-code">docker compose up -d</div>
-                    <div class="node-alt-desc">
-                        检查更新在容器里也不会自动跑；想看有没有新版本，比一下本页顶部版本号和官网 <a href="https://zta.cc.cd/changelog.html" target="_blank" rel="noopener">更新日志</a> 即可。三条下载线路是为 Windows 便携版准备的下包镜像。
+                </template>
+                <div class="node-block">
+                    <div class="node-desc">
+                        可以在网页里直接升级：检查更新 → 下载 tar.gz → 校验 SHA256 → 替换程序文件 → 服务自动重启。数据目录（默认 <code>/var/lib/ptbrush</code>）不动，配置、站点和数据库都保留。
                     </div>
+                    <div class="upd-grid">
+                        <div class="upd-item">
+                            <span class="upd-label">当前版本</span>
+                            <b>v{{ currentVersion || '—' }}</b>
+                        </div>
+                        <div class="upd-item">
+                            <span class="upd-label">最新版本</span>
+                            <b>{{ upd.latest ? 'v' + upd.latest : '未检查' }}</b>
+                        </div>
+                        <div class="upd-item">
+                            <span class="upd-label">状态</span>
+                            <b :class="{ 'upd-new': upd.has_update, 'upd-bad': !!upd.error }">{{ updStatus }}</b>
+                        </div>
+                        <div class="upd-item">
+                            <span class="upd-label">安装包</span>
+                            <b>{{ upd.size ? (upd.size / 1048576).toFixed(1) + ' MB' : '—' }}</b>
+                        </div>
+                    </div>
+                    <div class="node-save">
+                        <el-button :loading="checking" @click="checkUpdate">检查更新</el-button>
+                        <el-button type="primary" :disabled="!upd.has_update || upgrading" :loading="upgrading" @click="upgradeNow">立即升级</el-button>
+                        <span class="node-tip">升级时服务会重启几秒；升级包走 Cloudflare，失败自动改走 GitHub Release。</span>
+                    </div>
+                    <div v-if="upd.error" class="upd-error">{{ upd.error }}</div>
+                    <div v-if="upd.has_update && upd.notes" class="upd-notes">{{ upd.notes }}</div>
                 </div>
             </el-card>
                 </el-tab-pane>
