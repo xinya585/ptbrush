@@ -31,7 +31,15 @@ curl -fsSL https://raw.githubusercontent.com/xinya585/ptbrush/main/deploy/linux/
 sudo ptbrush
 ```
 
-菜单包含启动 / 停止 / 重启、升级到最新版、修改端口、查看日志、备份数据、从备份恢复、卸载；也支持命令行 `sudo ptbrush status`、`sudo ptbrush upgrade`、`sudo ptbrush backup`。
+菜单包含启动 / 停止 / 重启、升级到最新版、修改端口、查看日志、备份数据、从备份恢复、卸载；第 10 项可直接安装 qBittorrent 4.3.9。也支持命令行 `sudo ptbrush status`、`sudo ptbrush upgrade`、`sudo ptbrush backup`、`sudo ptbrush install-qb`。
+
+### 一键安装 qBittorrent 4.3.9
+
+```bash
+sudo ptbrush install-qb
+```
+
+会在本机安装 qBittorrent 4.3.9 静态二进制，创建 `qbittorrent` 系统用户和 systemd 服务 `qbittorrent-nox`，数据目录 `/var/lib/qbittorrent`。WebUI 默认使用 8080，端口被占用时自动顺延到 8081–8100。安装完成后会直接打印 WebUI 地址、账号 `admin` 和随机密码；密码同时保存在 `/etc/ptbrush-qbittorrent.env`（仅 root 可读）。在 PTBrush 的「下载器配置」里填 `http://127.0.0.1:<端口>` 即可。
 
 离线安装：从 Releases 下载 `ptbrush-linux-amd64.tar.gz`，解压后执行：
 
