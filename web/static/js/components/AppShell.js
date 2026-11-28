@@ -137,6 +137,9 @@ export default defineComponent({
             <el-main>
                 <router-view />
             </el-main>
+            <el-footer class="app-footer" :height="isMobile ? '30px' : '34px'">
+                <span v-if="version">PTBrush v{{ version }}</span>
+            </el-footer>
 
             <el-drawer
                 v-if="isMobile"

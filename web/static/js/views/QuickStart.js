@@ -199,8 +199,6 @@ export default defineComponent({
                 </el-col>
             </el-row>
 
-            <div class="qs-foot">PTBrush v1.2.3</div>
-
             <el-dialog v-model="previewVisible" title="参数预览" width="640px">
                 <div v-if="preview">
                     <div class="qs-preview-line">
