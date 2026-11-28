@@ -3264,7 +3264,7 @@ body {
     color: #409eff;
 }
 
-/* 容器版：这条卡不出现节点选择，改成一段升级说明 */
+/* 节点选择之外的补充说明（Windows 便携版用） */
 .node-alt {
     display: flex;
     flex-direction: column;

@@ -92,7 +92,7 @@ sudo bash ptbrush/install.sh --asset ./ptbrush-linux-amd64.tar.gz
 - CookieCloud 同步：把浏览器 Cookie 按域名写进站点（同一站点分散在多个 cookie 域时自动合并，不会只写一半），公共服务器默认 `https://cookie.scy.cc.cd`
 - 登录密码保护、日志页自动刷新（8 秒）、系统设置里可改密码
 - 备份与恢复：系统设置里「导出备份」把配置、库、账号数据、缓存打成一个 zip；换设备时在新机器「导入备份」，导入后点「重启生效」即恢复（导入前自动再备份一份，中途失败会回滚）
-- 升级：Docker 版换镜像即可（`docker compose pull && docker compose up -d`，`data` 目录不动）；Windows 便携版托盘右键「检查更新」自动下载替换
+- 升级：Docker 版换镜像即可（`docker compose pull && docker compose up -d`，`data` 目录不动，设置里不显示升级入口）；Windows 便携版托盘右键「检查更新」自动下载替换；Linux 原生安装直接在「系统设置 → 程序升级」里检查更新并一键升级（也可 `sudo ptbrush` 选「升级」）
 
 ## Docker 快速开始
 
@@ -192,7 +192,10 @@ data/
 没有过期清理，只按条数展示最近 60 条，历史都在 `ptbrush.db` 的 `brushdelrecord` 表里。
 
 **Q：容器版怎么升级？**
-`docker compose pull && docker compose up -d`。容器里的代码在镜像内，程序没法替换自己，所以设置页只给这条命令，不提供「下载安装包」按钮；`data` 目录不动，配置和记录都在。
+`docker compose pull && docker compose up -d`。容器里的代码在镜像内，程序没法替换自己，所以 Docker 版设置页不显示「程序升级」入口；`data` 目录不动，配置和记录都在。
+
+**Q：Linux 原生安装怎么升级？**
+「系统设置 → 程序升级」点「检查更新」，再点「立即升级」：下载 `tar.gz`、校验 SHA256、替换 `/opt/ptbrush/app` 下的程序文件（备份上一版，失败回滚），然后退出由 systemd 拉起，数据目录 `/var/lib/ptbrush` 不动。第一次若提示权限不足，执行一次 `sudo bash /opt/ptbrush/install.sh --yes`（数据不动）即可。也可以用 `sudo ptbrush` 选「升级」。
 
 **Q：换机器怎么迁移？**
 旧机器「系统设置 → 备份与恢复 → 导出备份」，新机器装好后「导入备份」再点「重启生效」。站点配置、下载器、CookieCloud 凭据、账号数据、缓存都会一起搬过去。
