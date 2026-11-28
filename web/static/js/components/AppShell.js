@@ -113,12 +113,10 @@ export default defineComponent({
                     <el-menu-item index="/sites">站点配置</el-menu-item>
                     <el-menu-item index="/downloader">下载器配置</el-menu-item>
                     <el-menu-item index="/brush">刷流配置</el-menu-item>
-            <el-menu-item index="/strategy">策略</el-menu-item>
-            <el-menu-item index="/start">快速开始</el-menu-item>
+                    <el-menu-item index="/start">快速开始</el-menu-item>
                     <el-menu-item index="/search">搜片</el-menu-item>
                     <el-menu-item index="/logs">日志</el-menu-item>
                     <el-menu-item index="/security">系统设置</el-menu-item>
-                    <el-menu-item index="/verified">详单</el-menu-item>
                 </el-menu>
                 <div v-if="isMobile" class="app-header-mobile">
                     <button class="app-nav-toggle" type="button" aria-label="打开导航" @click="menuOpen = true">
@@ -159,12 +157,10 @@ export default defineComponent({
                     <el-menu-item index="/sites">站点配置</el-menu-item>
                     <el-menu-item index="/downloader">下载器配置</el-menu-item>
                     <el-menu-item index="/brush">刷流配置</el-menu-item>
-            <el-menu-item index="/strategy">策略</el-menu-item>
-            <el-menu-item index="/start">快速开始</el-menu-item>
+                    <el-menu-item index="/start">快速开始</el-menu-item>
                     <el-menu-item index="/search">搜片</el-menu-item>
                     <el-menu-item index="/logs">日志</el-menu-item>
                     <el-menu-item index="/security">系统设置</el-menu-item>
-                    <el-menu-item index="/verified">详单</el-menu-item>
                 </el-menu>
             </el-drawer>
         </el-container>

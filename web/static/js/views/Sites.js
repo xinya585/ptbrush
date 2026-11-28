@@ -1,6 +1,7 @@
 import { defineComponent, computed, ref, onMounted, onUnmounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '../api.js';
+import CookieCloudCard from '../components/CookieCloudCard.js';
 
 const TYPES = [
     { value: 'nexusphp', label: 'NexusPHP', hint: '填站点地址 + 浏览器 Cookie' },
@@ -34,7 +35,7 @@ function domainOf(url) {
 function humanBytes(n) {
     const v = Number(n) || 0;
     if (!v) return '';
-    const units = [['PB', 1024 ** 5], ['TB', 1024 ** 4], ['GB', 1024 ** 3], ['MB', 1024 ** 2], ['KB', 1024]];
+    const units = [['PiB', 1024 ** 5], ['TiB', 1024 ** 4], ['GiB', 1024 ** 3], ['MiB', 1024 ** 2], ['KiB', 1024]];
     for (const [unit, size] of units) {
         if (v >= size) return `${(v / size).toFixed(3)} ${unit}`;
     }
@@ -69,6 +70,7 @@ function emptySite() {
 
 export default defineComponent({
     name: 'Sites',
+    components: { CookieCloudCard },
     setup() {
         const sites = ref([]);
         const siteTypes = ref(TYPES);
@@ -677,6 +679,8 @@ export default defineComponent({
                 </div>
             </div>
 
+            <CookieCloudCard @changed="load" />
+
             <div v-if="!sites.length && !loading" class="sites-empty">
                 <div class="sites-empty-title">还没有配置站点</div>
                 <div class="sites-empty-sub">点右上角「新增站点」，填站点地址和 Cookie 就能开始刷流。</div>
@@ -806,7 +810,7 @@ export default defineComponent({
                             </div>
                             <div class="pm-field">
                                 <div class="pm-label">备注</div>
-                                <el-input v-model="draft.note" placeholder="例如 主刷站 / 只刷免费种 / 每月上限 2T" />
+                                <el-input v-model="draft.note" placeholder="例如 主刷站 / 只刷免费种 / 每月上限 2 TiB" />
                             </div>
                         </div>
 

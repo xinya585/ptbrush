@@ -232,7 +232,7 @@ def backup_import():
     infos = zf.infolist()
     unpack_total = sum(max(0, i.file_size) for i in infos)
     if unpack_total > MAX_UNPACK_BYTES:
-        return jsonify({"error": "解压后超过 800 MB，拒绝导入"}), 400
+        return jsonify({"error": "解压后超过 800 MiB，拒绝导入"}), 400
 
     names = {i.filename for i in infos if not i.filename.endswith("/")}
     if "config.toml" not in names:

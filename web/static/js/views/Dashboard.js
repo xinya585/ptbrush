@@ -16,11 +16,15 @@ export default defineComponent({
         });
         const torrents = ref([]);
         const totalActive = ref(0);
+        const statsConfigured = ref(true);
+        const statsStale = ref(false);
         const health = ref({ ok: true, missing: [] });
 
         async function loadStats() {
             try {
                 const data = await api.get('/api/stats');
+                statsConfigured.value = data.configured !== false;
+                statsStale.value = !!data.stale;
                 Object.assign(stats, data.status);
                 torrents.value = data.torrents;
                 totalActive.value = data.total_active;
@@ -216,18 +220,18 @@ export default defineComponent({
             if (result === 'completed') {
                 push('候选池', cand + ' 个');
                 push('实际检查', checked + ' 个');
-                push('按策略筛掉', filtered + ' 个');
+                push('按选种条件筛掉', filtered + ' 个');
                 const reasonEntries = Object.entries(r.reasons || {}).sort((a, b) => b[1] - a[1]);
                 if (reasonEntries.length) {
                     push('筛种原因', reasonEntries.map(([k, v]) => k + ' ' + v + ' 个').join(' ｜ '));
                 }
                 const picked = Array.isArray(r.selected) ? r.selected : [];
                 if (picked.length) {
-                    push('本轮选中', picked.map((i) => i.name + '（' + i.site + '，' + i.size_gb + ' GB）').join(' ｜ '));
+                    push('本轮选中', picked.map((i) => i.name + '（' + i.site + '，' + i.size_gb + ' GiB）').join(' ｜ '));
                 }
                 const addedItems = Array.isArray(r.added_items) ? r.added_items : [];
                 if (addedItems.length) {
-                    push('成功加种', addedItems.map((i) => i.name + '（' + i.site + '，' + i.size_gb + ' GB）').join(' ｜ '));
+                    push('成功加种', addedItems.map((i) => i.name + '（' + i.site + '，' + i.size_gb + ' GiB）').join(' ｜ '));
                 }
             }
             if (r.uncompleted !== undefined && r.limit !== undefined) {
@@ -249,7 +253,7 @@ export default defineComponent({
                 push('促销要求', r.promotions.join(' / '));
             }
             if (r.size_range) {
-                push('体积区间', r.size_range + ' GB');
+                push('体积区间', r.size_range + ' GiB');
             }
             if (r.min_free_hours !== undefined) {
                 push('免费剩余门槛', r.min_free_hours + ' 小时');
@@ -293,6 +297,8 @@ export default defineComponent({
 
         return {
             stats,
+            statsConfigured,
+            statsStale,
             torrents,
             totalActive,
             health,
@@ -320,7 +326,10 @@ export default defineComponent({
                 <div>
                     <div class="sites-title">仪表盘</div>
                     <div class="sites-sub">
-                        默认下载器的实时状态（每 10 秒刷新）。
+                        <template v-if="!statsConfigured">还没有配置下载器，仪表盘不显示运行状态。</template>
+                        <template v-else>
+                            默认下载器的实时状态（每 10 秒刷新）<template v-if="statsStale"> · 最新采样 {{ stats.timestamp || '未知' }}</template>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -333,11 +342,20 @@ export default defineComponent({
                 title="配置不完整，刷流功能可能无法工作">
                 <template #default>
                     <div>缺失字段：<el-tag v-for="m in health.missing" :key="m" type="warning" size="small" style="margin-right:4px;">{{ m }}</el-tag></div>
-                    <router-link to="/brush" style="color:#e6a23c;text-decoration:underline;">前往刷流配置 →</router-link>
+                    <router-link to="/start" style="color:#e6a23c;text-decoration:underline;">前往快速开始 →</router-link>
                 </template>
             </el-alert>
 
-            <el-row :gutter="16">
+            <el-alert
+                v-if="statsConfigured && statsStale"
+                type="warning"
+                show-icon
+                :closable="false"
+                style="margin-bottom:16px;"
+                title="下载器状态已过期"
+                :description="'最近一次采样是 ' + (stats.timestamp || '未知时间') + '，已超过 15 分钟没有更新。连接恢复后会自动刷新。'" />
+
+            <el-row v-if="statsConfigured" :gutter="16">
                 <el-col :xs="12" :sm="6" v-for="card in [
                     { label: '上传速度', unit: 'MiB/s', val: formatSpeed(stats.upspeed) },
                     { label: '下载速度', unit: 'MiB/s', val: formatSpeed(stats.dlspeed) },
@@ -353,6 +371,18 @@ export default defineComponent({
                     </el-card>
                 </el-col>
             </el-row>
+
+            <el-card v-if="!statsConfigured" class="stat-card" shadow="hover" style="margin-bottom:16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+                    <div>
+                        <div class="stat-value" style="font-size:18px;">未配置下载器</div>
+                        <div class="stat-label" style="margin-top:4px;">添加一个 qBittorrent 下载器后，这里会显示实时上传、下载、活跃种子和剩余空间。</div>
+                    </div>
+                    <router-link to="/downloader">
+                        <el-button type="primary" plain>去下载器配置</el-button>
+                    </router-link>
+                </div>
+            </el-card>
 
             <el-card class="mt-4 brush-sites" shadow="hover" style="margin-top:16px;">
                 <template #header>
@@ -480,7 +510,7 @@ export default defineComponent({
                         <template #default="{ row }">
                             <div class="brush-del-reason">
                                 <el-tag size="small" :type="row.rule === '促销失效' ? 'warning' : 'info'" effect="plain">
-                                    {{ row.rule || '规则' }}
+                                    {{ row.rule || '自动' }}
                                 </el-tag>
                                 <span class="brush-del-reason-text">{{ row.reason }}</span>
                             </div>
@@ -528,7 +558,7 @@ export default defineComponent({
                             <span :class="['free-left', freeLeftOf(row).cls]">{{ freeLeftOf(row).text }}</span>
                         </template>
                     </el-table-column>
-                    <el-table-column label="Free 截止" width="140" align="center">
+                    <el-table-column label="免费截止" width="140" align="center">
                         <template #default="{ row }">{{ freeEndShort(row.free_end_time) }}</template>
                     </el-table-column>
                     <el-table-column prop="score" label="分数" width="66" align="right" />

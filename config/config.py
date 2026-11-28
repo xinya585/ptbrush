@@ -42,10 +42,10 @@ def clean_header_value(value: Optional[str]) -> str:
 
 # 促销类型：站点列表里的 Free / 2XFree / 2X / 50% 等标记，统一归一化成这几个值
 PROMOTION_META = [
-    {"value": "free", "label": "免费", "description": "下载不计下载量（Free）"},
-    {"value": "free_2x", "label": "2X 免费", "description": "下载免费且上传双倍（2X Free）"},
-    {"value": "2x", "label": "2X 上传", "description": "上传量双倍，下载照常计量（2X）"},
-    {"value": "half_down", "label": "50% 下载", "description": "下载量按一半计算（50% / 半价）"},
+    {"value": "free", "label": "免费", "description": "下载不计下载量"},
+    {"value": "free_2x", "label": "2X免费", "description": "下载免费，上传双倍"},
+    {"value": "2x", "label": "2X上传", "description": "上传量双倍，下载照常计量"},
+    {"value": "half_down", "label": "50%下载", "description": "下载量按一半计算"},
     {"value": "all", "label": "不限制", "description": "不挑促销类型，非促销种子也会下载（费下载量，慎用）"},
 ]
 
@@ -504,7 +504,7 @@ class BrushConfig(BaseModel):
     # 选种增强（留空不启用）
     include: str = ""   # 标题/描述必须匹配的正则
     exclude: str = ""   # 标题/描述命中就跳过
-    size: str = "1-100"  # 体积范围（GiB）："10" 表示不小于 10GB，"10-80" 表示这个区间
+    size: str = "1-100"  # 体积范围（GiB）："10" 表示不小于 10 GiB，"10-80" 表示这个区间
     seeder: str = "20"   # 做种人数范围："30" 表示不超过 30，"10-50" 表示这个区间
     pubtime: str = "60"  # 发布时间范围（分钟）："60" 表示 60 分钟内，"10-120" 表示这个区间
 

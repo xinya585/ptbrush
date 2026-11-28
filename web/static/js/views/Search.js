@@ -1,6 +1,7 @@
 import { defineComponent, reactive, ref, computed, onMounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import { api } from '../api.js';
+import { promotionLabel } from '../promo.js';
 
 // 搜片：关键字 → TMDB 候选海报 → 选中一部（跨站搜资源在下一步接入）
 // 站点开关只影响搜片，和「刷流配置」里那套开关各管一套、互不干扰
@@ -92,11 +93,6 @@ export default defineComponent({
             });
             return { sites, total: sites.reduce((n, s) => n + s.results.length, 0) };
         });
-
-        function promoLabel(p) {
-            const map = { free: '免费', free_2x: '免费 2X', '2x': '2X', half_down: '半价', none: '' };
-            return map[p] || '';
-        }
 
         function promoClass(p) {
             if (p === 'free' || p === 'free_2x') return 'rs-promo rs-promo-free';

@@ -42,7 +42,7 @@ class BrushInput(BaseModel):
     work_time: str = ""
     upload_cycle: int = Field(default=600, ge=60)
     download_cycle: int = Field(default=1200, ge=60)
-    # 选种规则：允许的促销类型（free / free_2x / 2x / half_down / all）
+    # 选种条件：允许的促销类型（free / free_2x / 2x / half_down / all）
     promotions: List[str] = ["free", "free_2x"]
     # 是否排除带 H&R 标记的种子
     exclude_hr: bool = True

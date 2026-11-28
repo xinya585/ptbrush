@@ -35,7 +35,7 @@ _SLOW_UP_SINCE: Dict[str, float] = {}
 # 上面两本表是「低速下载持续就删」的计时（阈值 slow_delete_speed），
 # 下面两本是「低速/等待不占下载位」的计时（阈值 download_speed_min / download_cycle）。
 # 必须分开：以前共用一本，删种分支每轮都会把「速度够删种阈值」的条目 pop 掉，
-# 结果 1~10 MB/s 的种子永远攒不满 10 分钟，『持续低速不占位』对它们完全失效。
+# 结果 1~10 MiB/s 的种子永远攒不满 10 分钟，『持续低速不占位』对它们完全失效。
 _SLOW_IDLE_SINCE: Dict[str, float] = {}
 _WAIT_IDLE_SINCE: Dict[str, float] = {}
 
@@ -62,17 +62,7 @@ from db import (
     Torrent as TorrentDB,
     TorrentDayDl,
     BrushDelRecord,
-    Rule,
-    Task,
-    ActionLog,
     database,
-)
-from rules_engine import (
-    delete_context,
-    evaluate,
-    item_from_db,
-    item_from_qb,
-    rule_dict,
 )
 from qbittorrent import QBittorrent
 from infohash import infohash_v1
@@ -155,7 +145,7 @@ class PtTorrentService():
                 for torrent in torrent_fetcher.free_torrents:
                     logger.info(
                         f"从{site.name}抓取到种子: {torrent.name}, 促销: {torrent.promotion}, "
-                        f"H&R: {'是' if torrent.hit_and_run else '否'}, 大小: {torrent.size/1024/1024:.2f}MB, "
+                        f"H&R: {'是' if torrent.hit_and_run else '否'}, 大小: {torrent.size/1024/1024:.2f} MiB, "
                         f"做种数: {torrent.seeders}, 下载数: {torrent.leechers}, 评分: {torrent.score}"
                     )
                     self._insert_or_update_torrent(torrent)
@@ -217,7 +207,7 @@ class QBTorrentService():
             logger.warning("没有配置任何下载器，跳过QB状态采集")
             return
         qb_status = self._qb.status
-        logger.info(f"正在记录QB状态 - 上传速度: {qb_status.upspeed/1024/1024:.2f}MB/s, 下载速度: {qb_status.dlspeed/1024/1024:.2f}MB/s, 剩余空间: {qb_status.free_space_size/1024/1024/1024:.2f}GB")
+        logger.info(f"正在记录QB状态 - 上传速度: {qb_status.upspeed/1024/1024:.2f}MiB/s, 下载速度: {qb_status.dlspeed/1024/1024:.2f}MiB/s, 剩余空间: {qb_status.free_space_size/1024/1024/1024:.2f}GiB")
         QBStatus.create(
             dlspeed=qb_status.dlspeed,
             upspeed=qb_status.upspeed,
@@ -276,7 +266,7 @@ class QBTorrentService():
         低速下载持续 N 分钟就删（独立阈值，只按本规则的 slow_delete_speed 判断；只看下载侧，不涉及上传）
 
         两类都算「下不动」：
-        - 速度低于 slow_delete_speed（MB/s）并持续 N 分钟；
+        - 速度低于 slow_delete_speed（MiB/s）并持续 N 分钟；
         - 一直卡在等待/排队/暂停状态（界面显示「等待」）持续 N 分钟还没动起来。
         填 0 分钟或阈值填 0 都表示关闭。H&R 种子跳过（删了要挨站点处罚）。
         """
@@ -296,7 +286,7 @@ class QBTorrentService():
         now = time.time()
         count = 0
         logger.info(
-            f"开始清理下不动的种子：低于 {threshold_mbps:.2f}MB/s 或一直等待，"
+            f"开始清理下不动的种子：低于 {threshold_mbps:.2f} MiB/s 或一直等待，"
             f"持续 {minutes} 分钟以上就删"
         )
         alive = set()
@@ -326,7 +316,7 @@ class QBTorrentService():
                         continue
                     reason, rule = "下载速度持续过低", "低速"
                     detail = (
-                        f"{speed_mb:.2f} MB/s 低于 {threshold_mbps:.2f} MB/s，"
+                        f"{speed_mb:.2f} MiB/s 低于 {threshold_mbps:.2f} MiB/s，"
                         f"已持续 {int((now - since) / 60)} 分钟未下完"
                     )
 
@@ -359,11 +349,11 @@ class QBTorrentService():
 
         只判**已经下载完成**的种子：下载中的种还在抢带宽、做种价值还没成形，
         拿它当下的上传速度去判"没价值"会误删抢手种。已下完的种挂着只有
-        0.0x MB/s，才说明这个种真没人要。
+        0.0x MiB/s，才说明这个种真没人要。
 
-        上传速度一直低于 slow_up_delete_speed（MB/s），持续 slow_up_delete_minutes
+        上传速度一直低于 slow_up_delete_speed（MiB/s），持续 slow_up_delete_minutes
         分钟就删掉，把保种位和上传带宽让给新热门种。盒子上位子有限，一个种挂着
-        只有 0.0x MB/s，留着纯占坑。
+        只有 0.0x MiB/s，留着纯占坑。
 
         - H&R 种子跳过（删了要挨站点处罚，由它自己的做种时长规则回收）；
         - 独立开关 slow_up_delete_enabled：关着就完全不判（阈值/分钟只是草稿），
@@ -391,7 +381,7 @@ class QBTorrentService():
         count = 0
         logger.info(
             f"开始清理低速上传的种子（盒子专用，只判已下载完成的种子）：低于 "
-            f"{threshold_mbps:.2f}MB/s 持续 {minutes} 分钟以上就删"
+            f"{threshold_mbps:.2f} MiB/s 持续 {minutes} 分钟以上就删"
         )
         alive = set()
         for qb in self._qbs:
@@ -411,7 +401,7 @@ class QBTorrentService():
                     logger.info(f"低速上传但带 H&R 标记，保留继续做种: {torrent.name}")
                     continue
                 detail = (
-                    f"{upspeed_mbps:.2f} MB/s 低于 {threshold_mbps:.2f} MB/s，"
+                    f"{upspeed_mbps:.2f} MiB/s 低于 {threshold_mbps:.2f} MiB/s，"
                     f"已持续 {int((now - since) / 60)} 分钟（阈值 {minutes} 分钟）"
                 )
                 logger.info(f"上传速度持续过低，删除种子: {torrent.name} | {detail}")
@@ -549,7 +539,7 @@ class QBTorrentService():
             dlspeed=torrent.dlspeed,
         )
         self._track_day_download(torrent)
-        logger.info(f"记录种子状态: {torrent.name} - 上传速度: {torrent.upspeed/1024/1024:.2f}MB/s, 下载速度: {torrent.dlspeed/1024/1024:.2f}MB/s, 已上传: {torrent.up_total_size/1024/1024:.2f}MB, 已下载: {torrent.dl_total_size/1024/1024:.2f}MB")
+        logger.info(f"记录种子状态: {torrent.name} - 上传速度: {torrent.upspeed/1024/1024:.2f} MiB/s, 下载速度: {torrent.dlspeed/1024/1024:.2f} MiB/s, 已上传: {torrent.up_total_size/1024/1024:.2f} MiB, 已下载: {torrent.dl_total_size/1024/1024:.2f} MiB")
 
     def clean_long_time_no_activate(self):
         """
@@ -654,7 +644,7 @@ class QBTorrentService():
                 if torrent.size < self._config.brush.torrent_max_size:
                     continue
 
-                logger.info(f"正在处理大包种子: {torrent.name}, 大小: {torrent.size/1024/1024/1024:.2f}GB")
+                logger.info(f"正在处理大包种子: {torrent.name}, 大小: {torrent.size/1024/1024/1024:.2f}GiB")
                 files = qb.get_torrent_files(torrent.hash)
                 all_file_ids = [file['index'] for file in files]
 
@@ -679,7 +669,7 @@ class QBTorrentService():
 
                 qb.set_no_download_files(torrent.hash, no_download_file_ids)
                 logger.info(
-                    f"种子{torrent.name}瘦身完成 - 选择下载: {selected_files}/{total_files}个文件, 预计大小: {current_size/1024/1024:.2f}MB")
+                    f"种子{torrent.name}瘦身完成 - 选择下载: {selected_files}/{total_files}个文件, 预计大小: {current_size/1024/1024:.2f} MiB")
                 thinned_count += 1
 
         logger.info(f"瘦身种子任务完成，本次共处理{thinned_count}个大包种子")
@@ -855,93 +845,14 @@ class QBTorrentService():
         logger.info(f"条件删种完成，本次共删除 {deleted} 个种子")
         return deleted
 
-    def clean_by_rules(self) -> int:
-        """按「删种规则」清理，规则默认停用；每轮/每小时都有安全阀。
-
-        规则按 priority 从小到大匹配，第一条命中即采用；KEEP 分类与「保种」标签始终跳过。
-        """
-        rules = list(Rule.select().where((Rule.kind == "delete") & (Rule.enabled == True))  # noqa: E712
-                     .order_by(Rule.priority, Rule.id))
-        if not rules:
-            return 0
-        ctx = delete_context(self)
-        now = datetime.now()
-        hour_ago = now - timedelta(hours=1)
-        per_hour_cache = {}
-        for rule in rules:
-            per_hour_cache[rule.id] = ActionLog.select().where(
-                (ActionLog.rule_id == rule.id) & (ActionLog.created_time >= hour_ago)
-            ).count()
-        round_used = {rule.id: 0 for rule in rules}
-        deleted = 0
-        for qb in self._qbs:
-            try:
-                torrents = qb.torrents
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"规则删种读取种子失败: {e}")
-                continue
-            to_delete, records = [], []
-            for t in torrents:
-                if str(getattr(t, "category", "") or "").upper() == "KEEP":
-                    continue
-                tags = getattr(t, "tags", None) or []
-                if any("保种" in str(x) for x in tags):
-                    continue
-                item = item_from_qb(t, ctx)
-                chosen = None
-                for rule in rules:
-                    ok, _ = evaluate(rule_dict(rule), item)
-                    if ok:
-                        chosen = rule
-                        break
-                if not chosen:
-                    continue
-                limits = rule_dict(chosen).get("limits") or {}
-                per_round = int(limits.get("per_round", 3) or 3)
-                per_hour = int(limits.get("per_hour", 30) or 30)
-                if round_used.get(chosen.id, 0) >= per_round:
-                    continue
-                if per_hour_cache.get(chosen.id, 0) >= per_hour:
-                    continue
-                round_used[chosen.id] = round_used.get(chosen.id, 0) + 1
-                per_hour_cache[chosen.id] = per_hour_cache.get(chosen.id, 0) + 1
-                to_delete.append(t.hash)
-                records.append((t, chosen, item))
-            if not to_delete:
-                continue
-            try:
-                qb.reannounce(to_delete)
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"删种前汇报失败（继续删）: {e}")
-            if not qb.delete_torrents(to_delete):
-                continue
-            deleted += len(to_delete)
-            for t, rule, item in records:
-                reason = f"{rule.name}：{rule_dict(rule).get('summary', '')}"
-                logger.info(f"规则删种: {item['name']}（{reason}）")
-                self._record_deletion(t, rule.name, rule="规则",
-                                      detail=f"{rule.name} | 分享率 {item['ratio']:.2f} | 做种 {item['seed_time']/3600:.1f}h")
-                try:
-                    ActionLog.create(kind="delete", rule_id=rule.id, rule_name=rule.name,
-                                     task_id=0, hash=str(getattr(t, "hash", "") or ""),
-                                     name=item["name"], site=item["tracker"],
-                                     size=int(item["total_size"] or 0),
-                                     reason=rule.name, detail=rule_dict(rule).get("summary", ""))
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(f"写规则审计日志失败: {e}")
-        if deleted:
-            logger.info(f"规则删种完成，本次删除 {deleted} 个")
-        return deleted
-
     def check_all(self) -> dict:
         """一次检查里跑完条件删种 + 促销复核 + 低速上传清理，供 check_interval 调度。
         「保种体积上限（动态删种）」已下线，volume 固定返回 0，字段保留给前端兼容。"""
         conditions = self.clean_by_conditions()
-        rules = self.clean_by_rules()
         promo = self.verify_free_status()
         # 盒子专用：做种中但长期不上传的种，腾保种位
         slow_up = self.clean_by_slow_upload()
-        return {"conditions": conditions, "rules": rules, "volume": 0, "promo": promo, "slow_up": slow_up}
+        return {"conditions": conditions, "volume": 0, "promo": promo, "slow_up": slow_up}
 
 
 # 刷流逻辑
@@ -993,7 +904,7 @@ class BrushService():
         未完成种子按「是不是真的在下」拆开数，返回 (占下载位的, 等待中的, 持续低速的)。
 
         等待（stalledDL，qB 里显示「等待」）、排队（queuedDL）、暂停都不占下载位；
-        下载速度低于 download_speed_min（MB/s）并且持续 download_cycle 秒以上也不占位。
+        下载速度低于 download_speed_min（MiB/s）并且持续 download_cycle 秒以上也不占位。
         统计跨全部下载器合并计数——站点可以绑定不同下载器，只看主下载器会让别的下载器上的种子白占位。
         """
         if not self._qbs:
@@ -1094,11 +1005,6 @@ class BrushService():
         # 没有配置的站点用全局策略
         fallback = (cfg.promotions, bool(cfg.exclude_hr), float(cfg.min_free_hours))
 
-        # 选种规则：只作为「额外闸门」，不覆盖原有促销/H&R/免费时长策略；
-        # 没有启用任何选种规则时完全不生效，行为与升级前一致。
-        select_rules = list(Rule.select().where((Rule.kind == "select") & (Rule.enabled == True))  # noqa: E712
-                            .order_by(Rule.priority, Rule.id))
-
         reasons: Dict[str, int] = {}
         # qB 里还没下完的同名种子（按站点归类），用于跨站同名保护
         unfinished = self._unfinished_titles_by_site()
@@ -1111,12 +1017,6 @@ class BrushService():
             if not filter_candidates([row], promotions, exclude_hr, min_free_hours):
                 reasons["促销/H&R/免费剩余时间不符"] = reasons.get("促销/H&R/免费剩余时间不符", 0) + 1
                 continue
-            # 选种规则：启用了就要求至少命中一条（第一条命中的语义在删种侧使用）
-            if select_rules:
-                item = item_from_db(row)
-                if not any(evaluate(rule_dict(r), item)[0] for r in select_rules):
-                    reasons["未命中选种规则"] = reasons.get("未命中选种规则", 0) + 1
-                    continue
             # 失败退避：上一轮加种失败过的候选，短期内不再重试，避免反复烧站点下载额度
             if self._in_backoff(row.site, row.torrent_id):
                 reasons["失败退避中"] = reasons.get("失败退避中", 0) + 1
@@ -1160,7 +1060,7 @@ class BrushService():
         selected_db.sort(key=lambda r: (r.size or 0))
         logger.info(
             "本轮选种（按抢上传排序）: " + " | ".join(
-                f"{r.name[:40]}({r.size / 1024 ** 3:.1f}GB)" for r in selected_db[:5]
+                f"{r.name[:40]}({r.size / 1024 ** 3:.1f}GiB)" for r in selected_db[:5]
             )
         )
 
@@ -1267,7 +1167,7 @@ class BrushService():
             res = qb.download_torrent_url(torrent_content, torrent_rename, save_path=site_save_path)
             if res:
                 logger.info(
-                    f"成功添加种子到QB: {torrent.name} (大小:{torrent.size/1024/1024:.2f}MB, "
+                    f"成功添加种子到QB: {torrent.name} (大小:{torrent.size/1024/1024:.2f} MiB, "
                     f"保存路径:{target_path or 'qB默认(_ptbrush)'})"
                 )
                 self._set_brushed(torrent)
@@ -1408,9 +1308,9 @@ class BrushService():
             parts = [float(x) for x in str(cfg.size).split("-")]
             if len(parts) == 1:
                 if gb < parts[0]:
-                    return False, f"体积 {gb:.1f}GB 低于下限 {parts[0]:g}GB"
+                    return False, f"体积 {gb:.1f} GiB 低于下限 {parts[0]:g} GiB"
             elif not (parts[0] <= gb <= parts[1]):
-                return False, f"体积 {gb:.1f}GB 不在 {cfg.size}GB 区间内"
+                return False, f"体积 {gb:.1f} GiB 不在 {cfg.size} GiB 区间内"
         if cfg.seeder:
             seeders = int(getattr(row, "seeders", 0) or 0)
             parts = [float(x) for x in str(cfg.seeder).split("-")]
@@ -1479,6 +1379,14 @@ class BrushService():
         刷流入口,返回添加种子的个数
         """
         logger.info(f"刷流任务开始...")
+        # 没配置下载器或站点时不要跑刷流：否则每轮都会写一份「0 候选」的诊断报告，
+        # 看起来像历史记录一直残留。初始化状态下仪表盘应当保持空白。
+        if not self._qbs:
+            logger.info("没有配置下载器，跳过刷流")
+            return 0
+        if not self._config.sites:
+            logger.info("没有配置站点，跳过刷流")
+            return 0
         # 站点分享率闸：达到目标就暂停新增
         blocked, block_reason = self._site_ratio_block()
         if blocked:
@@ -1497,11 +1405,11 @@ class BrushService():
         if self.qb_free_space_size < self._config.brush.min_disk_space:
             free_gb = self.qb_free_space_size / 1024 / 1024 / 1024
             min_gb = self._config.brush.min_disk_space / 1024 / 1024 / 1024
-            logger.info(f"qb剩余空间不足，停止刷流，当前剩余空间为:{free_gb:.2f}GB")
+            logger.info(f"qb剩余空间不足，停止刷流，当前剩余空间为:{free_gb:.2f}GiB")
             self.last_stats = {"candidates": 0, "filtered": 0, "added": 0, "reasons": {}}
             self._write_report(
                 result="low_disk",
-                message=f"下载盘剩余 {free_gb:.1f}GB，低于下限 {min_gb:.1f}GB，本轮没有加种",
+                message=f"下载盘剩余 {free_gb:.1f} GiB，低于下限 {min_gb:.1f} GiB，本轮没有加种",
                 disk_free_gb=round(free_gb, 1),
                 min_disk_gb=round(min_gb, 1),
                 **self._judge_payload(),

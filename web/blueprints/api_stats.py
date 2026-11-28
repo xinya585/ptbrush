@@ -12,14 +12,52 @@ from web.auth import login_required
 
 api_stats_bp = Blueprint("api_stats", __name__)
 
+# 状态采样每 10 分钟一次；超过 15 分钟没新样本就当作已过期，不再把旧数字当成实时状态
+STATUS_STALE_AFTER = timedelta(minutes=15)
+
+
+def _empty_status():
+    return {
+        "upspeed": 0,
+        "dlspeed": 0,
+        "up_total": 0,
+        "dl_total": 0,
+        "free_space": 0,
+        "timestamp": "",
+    }
+
 
 @api_stats_bp.route("/api/stats")
 @login_required
 def get_stats():
     try:
-        latest_status = QBStatus.select().order_by(QBStatus.created_time.desc()).first()
-
         now = datetime.now()
+
+        try:
+            from config.config import PTBrushConfig
+
+            configured = bool(PTBrushConfig().downloader_list())
+        except Exception:
+            # 配置读不到时不要直接把页面打空，按已配置处理
+            configured = True
+
+        # 没有下载器就没有“实时状态”可言。44446 这类沿用了旧数据卷的环境，
+        # QBStatus 里可能还留着几天前的最后一条采样，不能拿来当当前状态。
+        if not configured:
+            return jsonify({
+                "configured": False,
+                "stale": False,
+                "status": _empty_status(),
+                "torrents": [],
+                "total_active": 0,
+            })
+
+        latest_status = QBStatus.select().order_by(QBStatus.created_time.desc()).first()
+        stale = bool(
+            latest_status
+            and latest_status.created_time
+            and latest_status.created_time < now - STATUS_STALE_AFTER
+        )
 
         # 分数和展示名从库里补：qB 里的名字带 __meta 后缀，速度/流量只有 qB 是实时准确的
         score_of = {}
@@ -94,12 +132,14 @@ def get_stats():
 
         return jsonify(
             {
+                "configured": True,
+                "stale": stale,
                 "status": {
-                    "upspeed": latest_status.upspeed if latest_status else 0,
-                    "dlspeed": latest_status.dlspeed if latest_status else 0,
-                    "up_total": latest_status.up_total_size if latest_status else 0,
-                    "dl_total": latest_status.dl_total_size if latest_status else 0,
-                    "free_space": latest_status.free_space_size if hasattr(latest_status, "free_space_size") else 0,
+                    "upspeed": 0 if stale or not latest_status else latest_status.upspeed,
+                    "dlspeed": 0 if stale or not latest_status else latest_status.dlspeed,
+                    "up_total": 0 if stale or not latest_status else latest_status.up_total_size,
+                    "dl_total": 0 if stale or not latest_status else latest_status.dl_total_size,
+                    "free_space": 0 if stale or not latest_status or not hasattr(latest_status, "free_space_size") else latest_status.free_space_size,
                     "timestamp": latest_status.created_time.strftime("%Y-%m-%d %H:%M:%S") if latest_status else "",
                 },
                 "torrents": torrents_data,

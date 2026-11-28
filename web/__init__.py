@@ -53,7 +53,7 @@ def create_app():
     from web.blueprints.api_sites import api_sites_bp
     from web.blueprints.api_stats import api_stats_bp
     from web.blueprints.api_update import api_update_bp
-    from web.blueprints.api_rules import api_rules_bp
+    from web.blueprints.api_quickstart import api_quickstart_bp
 
     app.register_blueprint(api_auth_bp)
     app.register_blueprint(api_stats_bp)
@@ -65,7 +65,7 @@ def create_app():
     app.register_blueprint(api_security_bp)
     app.register_blueprint(api_update_bp)
     app.register_blueprint(api_backup_bp)
-    app.register_blueprint(api_rules_bp)
+    app.register_blueprint(api_quickstart_bp)
 
     @app.route("/api/version")
     def api_version():

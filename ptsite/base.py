@@ -111,20 +111,20 @@ def to_int(text: str, default: int = 0) -> int:
 
 
 def human_size(num_bytes) -> str:
-    """把字节数写成 1.2 GB 这种给人看的样式。"""
+    """把字节数写成 1.2 GiB 这种给人看的样式（按 1024 进制）。"""
     try:
         value = float(num_bytes or 0)
     except (TypeError, ValueError):
         return "—"
     if value <= 0:
         return "—"
-    for unit in ("B", "KB", "MB", "GB", "TB"):
-        if value < 1024 or unit == "TB":
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if value < 1024 or unit == "TiB":
             if unit == "B":
                 return f"{int(value)} B"
             return f"{value:.2f} {unit}"
         value /= 1024
-    return f"{value:.2f} TB"
+    return f"{value:.2f} TiB"
 
 
 class BaseSiteSpider(ABC):

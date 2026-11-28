@@ -3,12 +3,10 @@ import Dashboard from './views/Dashboard.js';
 import Sites from './views/Sites.js';
 import Downloader from './views/Downloader.js';
 import Config from './views/Config.js';
-import Strategy from './views/Strategy.js';
 import QuickStart from './views/QuickStart.js';
 import Search from './views/Search.js';
 import Logs from './views/Logs.js';
 import Security from './views/Security.js';
-import Verified from './views/Verified.js';
 import Login from './views/Login.js';
 
 export const router = createRouter({
@@ -19,15 +17,17 @@ export const router = createRouter({
         { path: '/sites', component: Sites, meta: { title: '站点配置' } },
         { path: '/downloader', component: Downloader, meta: { title: '下载器配置' } },
         { path: '/brush', component: Config, meta: { title: '刷流配置' } },
-        { path: '/strategy', component: Strategy, meta: { title: '策略中心' } },
         { path: '/start', component: QuickStart, meta: { title: '快速开始' } },
         { path: '/search', component: Search, meta: { title: '搜片' } },
         { path: '/logs', component: Logs, meta: { title: '日志' } },
         { path: '/security', component: Security, meta: { title: '系统设置' } },
-        { path: '/verified', component: Verified, meta: { title: '详单' } },
+        // 详单已并进系统设置，旧书签统一跳到合并后的页面
+        { path: '/verified', redirect: '/security' },
         // 老链接和书签还指向 /config，统一落到刷流配置
         { path: '/config', redirect: '/brush' },
         { path: '/login', component: Login, meta: { title: '登录', public: true } },
+        // 旧书签和未知路径统一回仪表盘
+        { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
     ],
 });
 

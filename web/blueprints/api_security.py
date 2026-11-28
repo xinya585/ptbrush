@@ -4,7 +4,7 @@
 
 页面 `/security` 对应的接口：
 
-  GET    /api/security                      初始数据（CookieCloud 凭据脱敏 + Web 登录状态）
+  GET    /api/security                      初始数据（CookieCloud 凭据不回填密码 + Web 登录状态）
   PUT    /api/security/cookiecloud          只改 [cookiecloud] 段，不碰 brush / sites / downloaders
 """
 from flask import Blueprint, jsonify, request
@@ -12,17 +12,21 @@ from flask import Blueprint, jsonify, request
 from config.config import PTBrushConfig
 from web.auth import is_login_required, login_required
 from web.config_io import atomic_write, read_raw
-from web.config_serializer import MASKED_SENTINEL, mask
+from web.config_serializer import MASKED_SENTINEL
 
 api_security_bp = Blueprint("api_security", __name__)
 
 
 def _serialize_cookiecloud(raw: dict) -> dict:
     cc = raw or {}
+    saved = cc.get("password", "") or ""
     return {
         "server": cc.get("server", "") or "",
         "uuid": cc.get("uuid", "") or "",
-        "password": mask(cc.get("password", "") or ""),
+        # 密码不回填任何内容：前端初始应为空，是否已保存只通过 has_password 表示。
+        # 需要保留旧密码时，前端显式回传 *** 哨兵；空字符串表示用户确实要清空。
+        "password": "",
+        "has_password": bool(saved),
     }
 
 
@@ -54,7 +58,8 @@ def update_cookiecloud():
 
     raw = read_raw()
     old = raw.get("cookiecloud") or {}
-    if password in ("", MASKED_SENTINEL):
+    # 只有显式回传 *** 才表示“沿用旧密码”；空字符串是用户清空了输入框，应当真正清除。
+    if password == MASKED_SENTINEL:
         password = old.get("password", "") or ""
     raw["cookiecloud"] = {"server": server, "uuid": uuid, "password": password}
 

@@ -178,9 +178,19 @@ def migrate_database():
             BrushDelRecord,
             # 种子 hash → 站点/免费时间的持久映射（替代把信息拼进种子名）
             SeedMeta,
-            # 规则引擎：规则 / 任务 / 动作审计（1.3.0）
-            Rule, Task, ActionLog,
         ])
+
+        # 策略页与规则引擎已移除：清掉历史规则 / 任务 / 审计表
+        try:
+            names = {row[0] for row in database.execute_sql(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()}
+            for table in ("rule", "task", "actionlog"):
+                if table in names:
+                    database.execute_sql(f'DROP TABLE IF EXISTS "{table}"')
+                    logger.info(f"策略历史表已清理: {table}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"策略历史表清理失败: {e}")
         
         # torrentdaydl 结构升级：老版本没有 free_bytes / paid_bytes / is_free，重建即可
         try:
@@ -282,53 +292,3 @@ class SeedMeta(BaseModel):
         database = database
 
 
-class Rule(BaseModel):
-    """一条策略规则：选种（select）或删种（delete）。
-
-    conditions 存 JSON 数组：[{field, op, value, value2}]，不做任意脚本执行。
-    """
-
-    kind = peewee.CharField(index=True)            # select / delete
-    name = peewee.CharField()
-    enabled = peewee.BooleanField(default=False, index=True)  # 导入一律停用
-    priority = peewee.IntegerField(default=10)
-    # 绑定的任务 id（JSON 数组）；空数组表示对所有任务生效
-    task_ids = peewee.TextField(default="[]")
-    match = peewee.CharField(default="all")        # all / any
-    conditions = peewee.TextField(default="[]")
-    sort = peewee.TextField(default="{}")          # 选种排序：{field, desc}
-    # 删种安全阀：{"per_round":3,"per_hour":30,"for_seconds":0}
-    limits = peewee.TextField(default="{}")
-    # 保护名单：{"keep":true,"tags":["保种"],"categories":["KEEP"]}
-    protect = peewee.TextField(default="{}")
-    preset_id = peewee.CharField(default="")
-    description = peewee.TextField(default="")
-
-
-class Task(BaseModel):
-    """一组站点 + 规则 + 下载器 + 限量。"""
-
-    name = peewee.CharField()
-    enabled = peewee.BooleanField(default=True, index=True)
-    # 参与站点（domain 数组）；空数组 = 全部站点
-    sites = peewee.TextField(default="[]")
-    downloader = peewee.CharField(default="")       # 下载器别名，空 = 主下载器
-    category = peewee.CharField(default="ptbrush")
-    save_path = peewee.CharField(default="")
-    per_hour = peewee.IntegerField(default=20)
-    interval = peewee.IntegerField(default=10)
-
-
-class ActionLog(BaseModel):
-    """规则动作审计：删了谁、哪条规则、为什么。"""
-
-    kind = peewee.CharField(default="delete", index=True)
-    rule_id = peewee.IntegerField(default=0, index=True)
-    rule_name = peewee.CharField(default="")
-    task_id = peewee.IntegerField(default=0)
-    hash = peewee.CharField(default="", index=True)
-    name = peewee.TextField(default="")
-    site = peewee.CharField(default="", index=True)
-    size = peewee.BigIntegerField(default=0)
-    reason = peewee.CharField(default="")
-    detail = peewee.TextField(default="")

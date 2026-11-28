@@ -1,13 +1,12 @@
 import { defineComponent } from 'vue';
 
 /**
- * 详单页。
+ * 详单内容面板：嵌在「系统设置」页的「详单」页签里。
  *
  * 把「已实测适配」的站点摊开给用户看：站点、域名、列表页、实测到的免费 / 2X免费 数量、
  * 判定方式（列表 + 详情页双校验）。下面再说明覆盖有限，欢迎提交测试账号做适配，并给出联系方式。
  *
- * 页面是静态数据：站点适配情况由人工实测后写在这里，不依赖后端接口，
- * 避免每次打开都要跑一遍抓取。
+ * 页面是静态数据：站点适配情况由人工实测后写在这里，不依赖后端接口。
  */
 
 const SITES = [
@@ -27,7 +26,7 @@ const SITES = [
 ];
 
 export default defineComponent({
-    name: 'Verified',
+    name: 'VerifiedPanel',
     setup() {
         // 域名打码：每一段只留开头两个字符，后面全用 * 补齐，TLD 原样保留
         // totheglory.im -> to********.im / pt.keepfrds.com -> pt.******.com / open.cd -> op**.cd
@@ -48,13 +47,7 @@ export default defineComponent({
         return { sites: SITES, maskDomain };
     },
     template: `
-        <div class="sites-page">
-            <div class="sites-header">
-                <div>
-                    <div class="sites-title">详单</div>
-                </div>
-            </div>
-
+        <div class="verified-panel">
             <el-card shadow="hover" style="margin-bottom:16px;">
                 <template #header>
                     <strong>适配概括</strong>
@@ -68,7 +61,7 @@ export default defineComponent({
                         下表是实测跑通过的站点，共 {{ sites.length }} 个。每个站点都做过「列表判免费 / 详情判免费」的双向抽样核对，
                         只认 <el-tag size="small" type="success" effect="plain">免费</el-tag>
                         <el-tag size="small" type="success" effect="plain">2X免费</el-tag>，
-                        2X、50%、30%、1/3/14 日返还一律不抓。
+                        2X上传、50%下载、30%下载、1/3/14 日返还一律不抓。
                     </p>
                     <p style="margin:0;">
                         实测数字是核对当天的首页真实结果，会随站点发种变化，不代表固定配额。
@@ -168,7 +161,7 @@ export default defineComponent({
 
                     <p style="margin:0 0 8px;color:#1f2937;font-weight:600;">项目地址</p>
                     <p style="margin:0 0 10px;">
-                        官网、Docker 镜像和源码仓库都在下面，安装包下载与版本更新日志以官网为准。
+                        官网、Docker 镜像、源码仓库和 CookieCloud 都在下面，安装包下载与版本更新日志以官网为准。
                     </p>
                     <div class="verified-contact">
                         <div class="verified-contact-item">
@@ -182,6 +175,10 @@ export default defineComponent({
                         <div class="verified-contact-item">
                             <span class="verified-contact-label">GitHub</span>
                             <a href="https://github.com/xinya585/ptbrush" target="_blank" rel="noopener">github.com/xinya585/ptbrush</a>
+                        </div>
+                        <div class="verified-contact-item">
+                            <span class="verified-contact-label">CookieCloud</span>
+                            <a href="https://cookie.scy.cc.cd/" target="_blank" rel="noopener">https://cookie.scy.cc.cd/</a>
                         </div>
                     </div>
                 </div>

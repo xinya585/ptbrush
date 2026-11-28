@@ -1,138 +1,37 @@
-import { defineComponent, reactive, ref, computed, onMounted } from 'vue';
+import { defineComponent, ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { api } from '../api.js';
 import PasswordCard from '../components/PasswordCard.js';
+import VerifiedPanel from '../components/VerifiedPanel.js';
 
 /**
  * 系统设置页。
  *
- * 四块内容：
- * 1. CookieCloud 同步 —— 凭据（服务器 / UUID / 密码）+ 预览 / 补全 PT 站点 / 同步到站点
- * 2. Web 访问        —— 登录密码（PasswordCard 组件）
- * 3. 备份与恢复      —— 一键导出全部配置数据；换设备导入恢复
- * 4. 下载与更新节点  —— 安装包走哪个节点（CF / 海外），更新清单一律自动选最快
+ * 三块内容：
+ * 1. Web 访问        —— 登录密码（PasswordCard 组件）
+ * 2. 备份与恢复      —— 一键导出全部配置数据；换设备导入恢复
+ * 3. 下载与更新节点  —— 安装包走哪个节点（CF / 海外），更新清单一律自动选最快
  *
- * 反馈与联系已经迁到「详单」页（站点适配与测试账号都在那边）。
+ * CookieCloud 同步已迁到「站点配置」页；详单作为本页「详单」页签。
  */
 
 export default defineComponent({
     name: 'Security',
-    components: { PasswordCard },
+    components: { PasswordCard, VerifiedPanel },
     setup() {
-        const form = reactive({
-            cookiecloud: { server: '', uuid: '', password: '' },
-        });
         const loading = ref(false);
-        const saving = ref(false);
-        const ccLoading = ref(false);
-        const ccPreview = ref(null);
-        // 预览默认只列 PT 站：CookieCloud 里一百多个域名绝大多数是普通网站，混在一起没法看
-        const ccOnlyPt = ref(true);
-        const ccDomains = computed(() => {
-            const list = (ccPreview.value && ccPreview.value.domains) || [];
-            return ccOnlyPt.value ? list.filter((d) => d && d.pt) : list;
-        });
         const loginRequired = ref(false);
+        const tab = ref('settings');
 
         async function load() {
             loading.value = true;
             try {
                 const res = await api.get('/api/security');
-                if (res?.cookiecloud) Object.assign(form.cookiecloud, res.cookiecloud);
                 loginRequired.value = !!res?.web?.login_required;
             } catch (e) {
                 ElMessage.error(e.message || '加载失败');
             } finally {
                 loading.value = false;
-            }
-        }
-
-        function ccPayload() {
-            return {
-                server: form.cookiecloud.server || '',
-                uuid: form.cookiecloud.uuid || '',
-                password: form.cookiecloud.password || '',
-            };
-        }
-
-        async function saveCookieCloud() {
-            saving.value = true;
-            try {
-                const res = await api.put('/api/security/cookiecloud', ccPayload());
-                ElMessage.success(res?.message || '已保存');
-                await load();
-            } catch (e) {
-                ElMessage.error(e.message || '保存失败');
-            } finally {
-                saving.value = false;
-            }
-        }
-
-        async function previewCookieCloud() {
-            if (!form.cookiecloud.uuid && !form.cookiecloud.server) {
-                ElMessage.warning('请先填 CookieCloud 的 UUID');
-                return;
-            }
-            ccLoading.value = true;
-            try {
-                const res = await api.post('/api/cookiecloud/preview', ccPayload());
-                if (!res?.ok) {
-                    ccPreview.value = null;
-                    ElMessage.error(res?.message || '拉取失败');
-                    return;
-                }
-                ccPreview.value = res;
-                ElMessage.success(`拉到 ${res.total_domains} 个域名、共 ${res.total_cookies} 个 cookie，其中 ${res.pt_domains || 0} 个是 PT 站`);
-            } catch (e) {
-                ccPreview.value = null;
-                ElMessage.error(e.message || '请求失败');
-            } finally {
-                ccLoading.value = false;
-            }
-        }
-
-        async function syncCookieCloud() {
-            ccLoading.value = true;
-            try {
-                const res = await api.post('/api/cookiecloud/sync', ccPayload());
-                if (!res?.ok) {
-                    ElMessage.error(res?.message || '同步失败');
-                    return;
-                }
-                const detail = (res.synced || [])
-                    .map(s => `${s.site}(${(s.domains || []).length} 个域 / ${s.cookies} 个 cookie)`)
-                    .join('、');
-                ElMessage.success(`${res.message}${detail ? '：' + detail : ''}`);
-                if (res.skipped?.length) {
-                    ElMessage.warning(res.skipped.map(s => `${s.site} 未同步：${s.reason}`).join('；'));
-                }
-                await load();
-            } catch (e) {
-                ElMessage.error(e.message || '请求失败');
-            } finally {
-                ccLoading.value = false;
-            }
-        }
-
-        async function addPtSites() {
-            ccLoading.value = true;
-            try {
-                const res = await api.post('/api/cookiecloud/add-pt-sites', ccPayload());
-                if (!res?.ok) {
-                    ElMessage.warning(res?.message || '没有新增站点');
-                } else {
-                    const detail = (res.added || []).map(a => a.site).join('、');
-                    ElMessage.success(`${res.message}${detail ? '：' + detail : ''}`);
-                    await load();
-                }
-                const other = (res?.skipped || []).filter(s => !String(s.reason || '').includes('已有站点'));
-                if (other.length) {
-                    ElMessage.warning(other.map(s => `${s.domain} 跳过：${s.reason}`).join('；'));
-                }
-            } catch (e) {
-                ElMessage.error(e.message || '请求失败');
-            } finally {
-                ccLoading.value = false;
             }
         }
 
@@ -291,8 +190,7 @@ export default defineComponent({
         });
 
         return {
-            form, loading, saving, ccLoading, ccPreview, ccOnlyPt, ccDomains, loginRequired,
-            load, saveCookieCloud, previewCookieCloud, syncCookieCloud, addPtSites,
+            tab, loading, loginRequired, load,
             exporting, importing, importDone, backupInfo,
             exportBackup, pickBackup, restartApp,
             nodeForm, nodeRows, nodeSaving, nodeProbing, portable,
@@ -307,63 +205,11 @@ export default defineComponent({
                 </div>
             </div>
 
-            <el-card shadow="hover" style="margin-bottom:16px;">
-                <template #header>
-                    <div class="card-header-row">
-                        <strong>CookieCloud 同步</strong>
-                        <div class="cc-actions">
-                            <el-button size="small" plain :loading="ccLoading" @click="previewCookieCloud">预览</el-button>
-                            <el-button size="small" :loading="ccLoading" @click="addPtSites">补全 PT 站点</el-button>
-                            <el-button size="small" type="primary" :loading="ccLoading" @click="syncCookieCloud">同步到站点</el-button>
-                        </div>
+            <el-tabs v-model="tab" class="settings-tabs">
+                <el-tab-pane label="常规设置" name="settings">
+                    <div style="margin-bottom:16px;">
+                        <PasswordCard :login-required="loginRequired" />
                     </div>
-                </template>
-                <el-form label-position="top">
-                    <div class="form-grid cc-grid">
-                        <el-form-item label="服务器地址">
-                            <el-input v-model="form.cookiecloud.server" placeholder="留空用公共服务器" />
-                        </el-form-item>
-                        <el-form-item label="UUID">
-                            <el-input v-model="form.cookiecloud.uuid" placeholder="浏览器插件里显示的 UUID" />
-                        </el-form-item>
-                        <el-form-item label="密码">
-                            <el-input v-model="form.cookiecloud.password" type="password" show-password placeholder="已保存的密码显示为 ***" />
-                        </el-form-item>
-                    </div>
-                    <div class="form-stack">
-                        <div class="password-actions">
-                            <el-button type="primary" :loading="saving" @click="saveCookieCloud">保存凭据</el-button>
-                        </div>
-                        <div v-if="ccPreview" class="cc-preview">
-                            <div class="cc-preview-title">
-                                <span>拉到 {{ ccPreview.total_domains }} 个域名、共 {{ ccPreview.total_cookies }} 个 cookie<template v-if="ccPreview.pt_domains">，其中 {{ ccPreview.pt_domains }} 个是 PT 站</template><template v-if="ccPreview.pt_names">（已加载 {{ ccPreview.pt_names }} 个站点的中文名）</template></span>
-                                <el-checkbox v-model="ccOnlyPt" size="small">只看 PT 站</el-checkbox>
-                            </div>
-                            <div v-if="!ccDomains.length" class="cc-empty">没有 PT 站</div>
-                            <div v-for="d in ccDomains" :key="d.domain" class="cc-domain-row">
-                                <span class="cc-domain">
-                                    <i v-if="d.pt" class="cc-pt-tag">PT</i>{{ d.domain }}
-                                </span>
-                                <span class="cc-count">{{ d.cookies }} 个</span>
-                                <span class="cc-match" :class="{ 'cc-match-none': !d.matched_sites.length }">
-                                    <template v-if="d.matched_sites.length">→ {{ d.matched_sites.join('、') }}</template>
-                                    <template v-else-if="d.pt_skip">{{ d.pt_skip }}</template>
-                                    <template v-else-if="d.pt && d.pt_name">→ {{ d.pt_name }}<span class="cc-add-hint">可添加</span></template>
-                                    <template v-else-if="d.pt">可自动添加</template>
-                                    <template v-else>未匹配站点</template>
-                                </span>
-                            </div>
-                        </div>
-                        <div class="field-help">
-                            公共服务器地址 https://cookie.scy.cc.cd，UUID / 密码请自行设置。
-                        </div>
-                    </div>
-                </el-form>
-            </el-card>
-
-            <div style="margin-bottom:16px;">
-                <PasswordCard :login-required="loginRequired" />
-            </div>
 
             <el-card shadow="hover" style="margin-bottom:16px;">
                 <template #header>
@@ -449,7 +295,12 @@ export default defineComponent({
                     </div>
                 </div>
             </el-card>
+                </el-tab-pane>
 
+                <el-tab-pane label="详单" name="verified" lazy>
+                    <VerifiedPanel />
+                </el-tab-pane>
+            </el-tabs>
         </div>
     `,
 });
