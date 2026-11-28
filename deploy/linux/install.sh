@@ -111,6 +111,15 @@ tar -xzf "$pkg" -C "$TMP" || die "解包失败"
 APPDIR="$TMP/ptbrush"
 [ -x "$APPDIR/ptbrush" ] || die "安装包结构不对：找不到 ptbrush 可执行文件"
 
+# 管理菜单单独从 main 拉取，避免只改菜单也要等新的二进制发布
+if curl -fsSL --retry 2 --connect-timeout 10 \
+    "https://raw.githubusercontent.com/${REPO}/main/deploy/linux/menu.sh" \
+    -o "$TMP/menu.sh.latest" 2>/dev/null; then
+    install -m 755 "$TMP/menu.sh.latest" "$APPDIR/menu.sh"
+else
+    warn "管理菜单在线更新失败，使用安装包内置版本"
+fi
+
 if ! id ptbrush >/dev/null 2>&1; then
     log "创建系统用户 ptbrush"
     useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin ptbrush 2>/dev/null \
@@ -179,6 +188,7 @@ cat <<EOF
   访问地址：http://${IP}:${PORT}
   数据目录：${DATA}
   管理菜单：sudo ptbrush
+  安装 qB ：sudo ptbrush install-qb
   查看日志：journalctl -u ptbrush -f
   systemd ：systemctl status ptbrush
 
